@@ -1,4 +1,4 @@
-import { Box, Button, Container, Stack, Typography } from "@mui/material";
+﻿import { Box, Button, Container, Stack, Typography } from "@mui/material";
 import LogoutIcon from "@mui/icons-material/Logout";
 import EmojiNatureIcon from "@mui/icons-material/EmojiNature";
 import { useEffect } from "react";
@@ -42,6 +42,12 @@ const StudentLayout = ({ children }: Props) => {
   }, [user?.id]);
 
   const handleLogout = async () => {
+    if ((window as any).__surveyDirtyGuard) {
+      const ok = window.confirm("检测到问卷信息有修改，请注意保存！");
+      if (!ok) {
+        return;
+      }
+    }
     try {
       await client.post("/auth/logout");
     } catch (error) {

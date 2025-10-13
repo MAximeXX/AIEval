@@ -1,9 +1,10 @@
-import React, {
+﻿import React, {
   ChangeEvent,
   memo,
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import {
@@ -62,7 +63,7 @@ type SurveyConfig = {
   composite_questions: CompositeQuestion[];
 };
 
-const frequencyOptions = ["每天", "经常", "偶尔"];
+const frequencyOptions = ["每天", "经常", "偶尔", "从不"];
 const skillOptions = ["熟练", "一般", "不会"];
 const habitOptions = ["完全同意", "比较同意", "部分同意", "不同意"];
 
@@ -93,6 +94,243 @@ type SurveyContentProps = {
   onSaveSurvey: () => void;
 };
 
+const EMPTY_ANSWER: SurveyItemAnswer = {
+  frequency: "",
+  skill: "",
+  traits: [],
+};
+
+const columnBorderSx = { borderRight: 1, borderColor: "divider" };
+const tableMainHeaderSx = {
+  fontSize: "1.1rem",
+  fontWeight: 700,
+  textAlign: "center",
+  whiteSpace: "nowrap",
+  lineHeight: 1.4,
+};
+const tableSubHeaderSx = {
+  fontSize: "1.05rem",
+  fontWeight: 600,
+  textAlign: "center",
+  whiteSpace: "nowrap",
+  lineHeight: 1.4,
+};
+const optionLabelSx = {
+  mr: 0,
+  whiteSpace: "nowrap",
+  "& .MuiFormControlLabel-label": { fontSize: "0.95rem" },
+};
+const verticalCategoryTextSx = {
+  writingMode: "vertical-rl",
+  textOrientation: "upright",
+  fontSize: "1.05rem",
+  fontWeight: 600,
+  display: "inline-block",
+  margin: "0 auto",
+};
+const verticalSubCategoryTextSx = {
+  writingMode: "vertical-rl",
+  textOrientation: "upright",
+  fontSize: "1rem",
+  fontWeight: 600,
+  display: "inline-block",
+  margin: "0 auto",
+};
+const projectTextSx = {
+  fontSize: "0.95rem",
+  textAlign: "left",
+  whiteSpace: "normal",
+  lineHeight: 1.6,
+  display: "inline-block",
+};
+
+type StructuredRow = {
+  major: string;
+  minor: string;
+  item: { id: number; prompt: string };
+  showMajor: boolean;
+  showMinor: boolean;
+  majorRowSpan: number;
+  minorRowSpan: number;
+};
+
+type SurveyRowProps = {
+  row: StructuredRow;
+  value: SurveyItemAnswer | undefined;
+  traitsList: string[];
+  onUpdateAnswer: (itemId: number, partial: Partial<SurveyItemAnswer>) => void;
+  onToggleTrait: (itemId: number, trait: string) => void;
+};
+
+const SurveyRow = memo(
+  ({ row, value, traitsList, onUpdateAnswer, onToggleTrait }: SurveyRowProps) => {
+    const currentValue = value ?? EMPTY_ANSWER;
+
+    return (
+      <TableRow sx={{ "& td": { py: 1.5 } }}>
+        {row.showMajor && (
+          <TableCell
+            rowSpan={row.majorRowSpan}
+            sx={{
+              ...columnBorderSx,
+              verticalAlign: "middle",
+              textAlign: "center",
+              minWidth: 80,
+              px: 1,
+            }}
+          >
+            <Typography sx={verticalCategoryTextSx}>{row.major}</Typography>
+          </TableCell>
+        )}
+        {row.showMinor && (
+          <TableCell
+            rowSpan={row.minorRowSpan}
+            sx={{
+              ...columnBorderSx,
+              verticalAlign: "middle",
+              textAlign: "center",
+              minWidth: 90,
+              px: 1,
+            }}
+          >
+            <Typography sx={verticalSubCategoryTextSx}>{row.minor}</Typography>
+          </TableCell>
+        )}
+        <TableCell
+          sx={{
+            ...columnBorderSx,
+            verticalAlign: "middle",
+            textAlign: "center",
+            minWidth: 140,
+            px: 2,
+          }}
+        >
+          <Typography sx={projectTextSx}>{row.item.prompt}</Typography>
+        </TableCell>
+        <TableCell
+          sx={{
+            ...columnBorderSx,
+            verticalAlign: "middle",
+            textAlign: "center",
+            px: 2,
+          }}
+        >
+          <RadioGroup
+            row
+            value={currentValue.frequency}
+            onChange={(event) =>
+              onUpdateAnswer(row.item.id, {
+                frequency: event.target.value,
+              })
+            }
+            sx={{
+              flexWrap: "nowrap",
+              columnGap: 2,
+              justifyContent: "center",
+            }}
+          >
+            {frequencyOptions.map((option) => (
+              <FormControlLabel
+                key={option}
+                value={option}
+                control={<Radio size="small" sx={{ p: 0.5 }} />}
+                label={option}
+                sx={optionLabelSx}
+              />
+            ))}
+          </RadioGroup>
+        </TableCell>
+        <TableCell
+          sx={{
+            ...columnBorderSx,
+            verticalAlign: "middle",
+            textAlign: "center",
+            px: 2,
+          }}
+        >
+          <RadioGroup
+            row
+            value={currentValue.skill}
+            onChange={(event) =>
+              onUpdateAnswer(row.item.id, {
+                skill: event.target.value,
+              })
+            }
+            sx={{
+              flexWrap: "nowrap",
+              columnGap: 2,
+              justifyContent: "center",
+            }}
+          >
+            {skillOptions.map((option) => (
+              <FormControlLabel
+                key={option}
+                value={option}
+                control={<Radio size="small" sx={{ p: 0.5 }} />}
+                label={option}
+                sx={optionLabelSx}
+              />
+            ))}
+          </RadioGroup>
+        </TableCell>
+        <TableCell
+          sx={{
+            ...columnBorderSx,
+            verticalAlign: "middle",
+            textAlign: "center",
+            minWidth: 240,
+            px: 2,
+          }}
+        >
+          <Grid container rowSpacing={0.5} columnSpacing={1}>
+            {traitsList.map((trait) => (
+              <Grid item xs={4} key={trait}>
+                <FormControlLabel
+                  control={
+                    <Checkbox
+                      size="small"
+                      sx={{ p: 0.5 }}
+                      checked={currentValue.traits.includes(trait)}
+                      onChange={() => onToggleTrait(row.item.id, trait)}
+                    />
+                  }
+                  label={trait}
+                  sx={{
+                    mr: 0,
+                    whiteSpace: "nowrap",
+                    "& .MuiFormControlLabel-label": {
+                      fontSize: "0.95rem",
+                    },
+                  }}
+                />
+              </Grid>
+            ))}
+          </Grid>
+        </TableCell>
+      </TableRow>
+    );
+  },
+  (prev, next) => {
+    if (prev.row !== next.row) return false;
+    if (prev.traitsList !== next.traitsList) return false;
+    if (prev.value === next.value) return true;
+    if (!prev.value || !next.value) return false;
+    if (
+      prev.value.frequency !== next.value.frequency ||
+      prev.value.skill !== next.value.skill
+    ) {
+      return false;
+    }
+    const prevTraits = prev.value.traits;
+    const nextTraits = next.value.traits;
+    if (prevTraits.length !== nextTraits.length) {
+      return false;
+    }
+    return prevTraits.every((trait, index) => trait === nextTraits[index]);
+  },
+);
+
+
 const SurveyContent = memo(
   ({
     config,
@@ -107,127 +345,117 @@ const SurveyContent = memo(
     onCompositeRadio,
     onCompositeScore,
     onSaveSurvey,
-  }: SurveyContentProps) => (
-    <>
-      <Card>
-        <CardContent>
-          <Typography variant="h6" fontWeight={600} mb={2}>
-            学生自评表          </Typography>
-          <Table size="small">
-            <TableHead>
-              <TableRow>
-                <TableCell width="22%">劳动项目</TableCell>
-                <TableCell width="20%">参与情况</TableCell>
-                <TableCell width="20%">技能掌握</TableCell>
-                <TableCell>品格养成（最多选 3 项）</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {config.sections.map((section) =>
-                section.items.map((item) => {
-                  const value = answers[item.id] ?? {
-                    frequency: "",
-                    skill: "",
-                    traits: [],
-                  };
-                  return (
-                    <TableRow key={item.id}>
-                      <TableCell>
-                        <Typography fontWeight={600}>
-                          {section.major_category}
-                        </Typography>
-                        <Typography color="text.secondary">
-                          {section.minor_category}
-                        </Typography>
-                        <Typography mt={1}>{item.prompt}</Typography>
-                      </TableCell>
-                      <TableCell>
-                        <RadioGroup
-                          row
-                          value={value.frequency}
-                          onChange={(event) =>
-                            onUpdateAnswer(item.id, {
-                              frequency: event.target.value,
-                            })
-                          }
-                        >
-                          {frequencyOptions.map((option) => (
-                            <FormControlLabel
-                              key={option}
-                              value={option}
-                              control={<Radio />}
-                              label={option}
-                            />
-                          ))}
-                        </RadioGroup>
-                      </TableCell>
-                      <TableCell>
-                        <RadioGroup
-                          row
-                          value={value.skill}
-                          onChange={(event) =>
-                            onUpdateAnswer(item.id, {
-                              skill: event.target.value,
-                            })
-                          }
-                        >
-                          {skillOptions.map((option) => (
-                            <FormControlLabel
-                              key={option}
-                              value={option}
-                              control={<Radio />}
-                              label={option}
-                            />
-                          ))}
-                        </RadioGroup>
-                      </TableCell>
-                      <TableCell>
-                        <Grid container spacing={1}>
-                          {traitsList.map((trait) => (
-                            <Grid item xs={4} key={trait}>
-                              <FormControlLabel
-                                control={
-                                  <Checkbox
-                                    checked={value.traits.includes(trait)}
-                                    onChange={() =>
-                                      onToggleTrait(item.id, trait)
-                                    }
-                                  />
-                                }
-                                label={trait}
-                              />
-                            </Grid>
-                          ))}
-                        </Grid>
-                      </TableCell>
-                    </TableRow>
-                  );
-                }),
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+  }: SurveyContentProps) => {
+    const majorTotals = useMemo(() => {
+      const totals = new Map<string, number>();
+      config.sections.forEach((section) => {
+        totals.set(
+          section.major_category,
+          (totals.get(section.major_category) ?? 0) + section.items.length,
+        );
+      });
+      return totals;
+    }, [config.sections]);
 
-      <Card>
-        <CardContent>
-          <Typography variant="h6" fontWeight={600} mb={2}>
-            综合问题
-          </Typography>
-          <Stack spacing={3}>
-            <Box>
-              <Typography fontWeight={600} mb={1}>
-                经过这次劳动计划，你参与劳动的总体频率是？             </Typography>
-              <Grid container spacing={2}>
-                {["原来", "现在"].map((phase) => (
-                  <Grid item xs={12} md={6} key={phase}>
-                    <Typography color="text.secondary">{phase}</Typography>
+    const structuredRows = useMemo(() => {
+      const rows: Array<{
+        major: string;
+        minor: string;
+        item: { id: number; prompt: string };
+        showMajor: boolean;
+        showMinor: boolean;
+        majorRowSpan: number;
+        minorRowSpan: number;
+      }> = [];
+      const majorSeen = new Map<string, number>();
+      config.sections.forEach((section) => {
+        const majorKey = section.major_category;
+        section.items.forEach((item, index) => {
+          const processed = majorSeen.get(majorKey) ?? 0;
+          const showMajor = processed === 0;
+          majorSeen.set(majorKey, processed + 1);
+          rows.push({
+            major: majorKey,
+            minor: section.minor_category,
+            item,
+            showMajor,
+            showMinor: index === 0,
+            majorRowSpan: showMajor
+              ? majorTotals.get(majorKey) ?? section.items.length
+              : 0,
+            minorRowSpan: index === 0 ? section.items.length : 0,
+          });
+        });
+      });
+      return rows;
+    }, [config.sections, majorTotals]);
+
+    return (
+      <>
+        <Card>
+          <CardContent>
+            <Typography variant="h6" fontWeight={600} mb={2}>
+              学生自评表
+            </Typography>
+            <Box sx={{ overflowX: "auto" }}>
+              <Table size="small" sx={{ minWidth: 960 }}>
+                <TableHead>
+                  <TableRow>
+                    <TableCell colSpan={3} sx={{ ...columnBorderSx, ...tableMainHeaderSx }}>
+                      劳动项目
+                    </TableCell>
+                    <TableCell rowSpan={2} sx={{ ...columnBorderSx, ...tableMainHeaderSx }}>
+                      参与情况
+                    </TableCell>
+                    <TableCell rowSpan={2} sx={{ ...columnBorderSx, ...tableMainHeaderSx }}>
+                      技能掌握
+                    </TableCell>
+                    <TableCell rowSpan={2} sx={{ ...columnBorderSx, ...tableMainHeaderSx }}>
+                      品格养成（最多选 3 项）
+                    </TableCell>
+                  </TableRow>
+                  <TableRow>
+                    <TableCell sx={{ ...columnBorderSx, ...tableSubHeaderSx }}>大类别</TableCell>
+                    <TableCell sx={{ ...columnBorderSx, ...tableSubHeaderSx }}>细分类别</TableCell>
+                    <TableCell sx={{ ...columnBorderSx, ...tableSubHeaderSx }}>具体劳动项目</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {structuredRows.map((row) => (
+                    <SurveyRow
+                      key={row.item.id}
+                      row={row}
+                      value={answers[row.item.id]}
+                      traitsList={traitsList}
+                      onUpdateAnswer={onUpdateAnswer}
+                      onToggleTrait={onToggleTrait}
+                    />
+                  ))}
+                </TableBody>
+              </Table>
+            </Box>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent>
+            <Typography variant="h6" fontWeight={600} mb={2}>
+              综合问题
+            </Typography>
+            <Stack spacing={3}>
+              <Box>
+                <Typography fontWeight={600} mb={1}>
+                  1、经过这次劳动计划，你参与劳动的总体频率是？
+                </Typography>
+                <Stack spacing={1}>
+                  <Box display="flex" alignItems="center">
+                    <Typography color="text.secondary" sx={{ mr: 1 }}>
+                      原来：
+                    </Typography>
                     <RadioGroup
                       row
-                      value={composite.q1[phase] ?? ""}
-                      onChange={(event) =>
-                        onCompositeRadio("q1", phase, event.target.value)
-                      }
+                      value={composite.q1.原来 ?? ""}
+                      onChange={(event) => onCompositeRadio("q1", "原来", event.target.value)}
                     >
                       {frequencyOptions.map((option) => (
                         <FormControlLabel
@@ -238,24 +466,42 @@ const SurveyContent = memo(
                         />
                       ))}
                     </RadioGroup>
-                  </Grid>
-                ))}
-              </Grid>
-            </Box>
-            <Divider />
-            <Box>
-              <Typography fontWeight={600} mb={1}>
-               经过这次劳动计划，你已经养成了积极参与劳动的习惯?                  </Typography>
-              <Grid container spacing={2}>
-                {["原来", "现在"].map((phase) => (
-                  <Grid item xs={12} md={6} key={phase}>
-                    <Typography color="text.secondary">{phase}</Typography>
+                  </Box>
+                  <Box display="flex" alignItems="center">
+                    <Typography color="text.secondary" sx={{ mr: 1 }}>
+                      现在：
+                    </Typography>
                     <RadioGroup
                       row
-                      value={composite.q2[phase] ?? ""}
-                      onChange={(event) =>
-                        onCompositeRadio("q2", phase, event.target.value)
-                      }
+                      value={composite.q1.现在 ?? ""}
+                      onChange={(event) => onCompositeRadio("q1", "现在", event.target.value)}
+                    >
+                      {frequencyOptions.map((option) => (
+                        <FormControlLabel
+                          key={option}
+                          value={option}
+                          control={<Radio />}
+                          label={option}
+                        />
+                      ))}
+                    </RadioGroup>
+                  </Box>
+                </Stack>
+              </Box>
+              <Divider />
+              <Box>
+                <Typography fontWeight={600} mb={1}>
+                  2、经过这次劳动计划，你已经养成了积极参与劳动的习惯吗？
+                </Typography>
+                <Stack spacing={1}>
+                  <Box display="flex" alignItems="center">
+                    <Typography color="text.secondary" sx={{ mr: 1 }}>
+                      原来：
+                    </Typography>
+                    <RadioGroup
+                      row
+                      value={composite.q2.原来 ?? ""}
+                      onChange={(event) => onCompositeRadio("q2", "原来", event.target.value)}
                     >
                       {habitOptions.map((option) => (
                         <FormControlLabel
@@ -266,45 +512,61 @@ const SurveyContent = memo(
                         />
                       ))}
                     </RadioGroup>
-                  </Grid>
-                ))}
-              </Grid>
-            </Box>
-            {!isFirstGrade && (
-              <>
-                <Divider />
-                <Box>
-                  <Typography fontWeight={600} mb={1}>
-                    请为你在这次劳动计划中表现出的品质打个分吧（0-100）！
-                  </Typography>
-                  {stages.length === 0 ? (
-                    <Typography color="text.secondary">
-                      当前年级暂无阶段数据，可跳过此项                     </Typography>
-                  ) : (
-                    <Table size="small">
-                      <TableHead>
-                        <TableRow>
-                          <TableCell>阶段</TableCell>
-                          <TableCell>坚毅担责</TableCell>
-                          <TableCell>勤劳诚实</TableCell>
-                          <TableCell>合作智慧</TableCell>
-                        </TableRow>
-                      </TableHead>
-                      <TableBody>
-                        {stages.map((stage) => (
-                          <TableRow key={stage}>
-                            <TableCell>{stage}</TableCell>
-                            {["坚毅担责", "勤劳诚实", "合作智慧"].map(
-                              (metric) => (
+                  </Box>
+                  <Box display="flex" alignItems="center">
+                    <Typography color="text.secondary" sx={{ mr: 1 }}>
+                      现在：
+                    </Typography>
+                    <RadioGroup
+                      row
+                      value={composite.q2.现在 ?? ""}
+                      onChange={(event) => onCompositeRadio("q2", "现在", event.target.value)}
+                    >
+                      {habitOptions.map((option) => (
+                        <FormControlLabel
+                          key={option}
+                          value={option}
+                          control={<Radio />}
+                          label={option}
+                        />
+                      ))}
+                    </RadioGroup>
+                  </Box>
+                </Stack>
+              </Box>
+              {!isFirstGrade && (
+                <>
+                  <Divider />
+                  <Box>
+                    <Typography fontWeight={600} mb={1}>
+                      3、请为你在这次劳动计划中表现出的品质打个分吧（0-100）！
+                    </Typography>
+                    {stages.length === 0 ? (
+                      <Typography color="text.secondary">
+                        当前年级暂无阶段数据，可跳过此项
+                      </Typography>
+                    ) : (
+                      <Table size="small">
+                        <TableHead>
+                          <TableRow>
+                            <TableCell>阶段</TableCell>
+                            <TableCell>坚毅担责</TableCell>
+                            <TableCell>勤劳诚实</TableCell>
+                            <TableCell>合作智慧</TableCell>
+                          </TableRow>
+                        </TableHead>
+                        <TableBody>
+                          {stages.map((stage) => (
+                            <TableRow key={stage}>
+                              <TableCell>{stage}</TableCell>
+                              {["坚毅担责", "勤劳诚实", "合作智慧"].map((metric) => (
                                 <TableCell key={metric}>
                                   <TextField
                                     type="number"
                                     inputProps={{ min: 0, max: 100 }}
                                     size="small"
                                     value={composite.q3[stage]?.[metric] ?? ""}
-                                    onChange={(
-                                      event: ChangeEvent<HTMLInputElement>,
-                                    ) =>
+                                    onChange={(event: ChangeEvent<HTMLInputElement>) =>
                                       onCompositeScore(
                                         stage,
                                         metric,
@@ -313,33 +575,34 @@ const SurveyContent = memo(
                                     }
                                   />
                                 </TableCell>
-                              ),
-                            )}
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  )}
-                </Box>
-              </>
-            )}
-          </Stack>
-        </CardContent>
-      </Card>
+                              ))}
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    )}
+                  </Box>
+                </>
+              )}
+            </Stack>
+          </CardContent>
+        </Card>
 
-      <Stack direction={{ xs: "column", md: "row" }} spacing={2}>
-        <Button
-          variant="contained"
-          color="primary"
-          onClick={onSaveSurvey}
-          disabled={savingSurvey}
-        >
-          {savingSurvey ? "保存中..." : "保存问卷信息"}
-        </Button>
-      </Stack>
-    </>
-  ),
+        <Stack direction={{ xs: "column", md: "row" }} spacing={2}>
+          <Button
+            variant="contained"
+            color="primary"
+            onClick={onSaveSurvey}
+            disabled={savingSurvey}
+          >
+            {savingSurvey ? "保存中..." : "保存问卷信息"}
+          </Button>
+        </Stack>
+      </>
+    );
+  },
 );
+
 
 SurveyContent.displayName = "SurveyContent";
 
@@ -360,13 +623,15 @@ const SurveyPage = () => {
   const [parentNote, setParentNote] = useState("");
   const [savingSurvey, setSavingSurvey] = useState(false);
   const [savingNote, setSavingNote] = useState(false);
-  const [dirtySurvey, setDirtySurvey] = useState(false);
-  const [dirtyNote, setDirtyNote] = useState(false);
-
-  const traitsList = config?.traits ?? [];
+const [dirtySurvey, setDirtySurvey] = useState(false);
+const [dirtyNote, setDirtyNote] = useState(false);
+const dirtyRef = useRef(false);
+const UNSAVED_PROMPT = "检测到问卷信息有修改，请注意保存！";
+const traitsList = config?.traits ?? [];
 
   useEffect(() => {
-    const load = async () => {
+    let isMounted = true;
+    const fetchData = async () => {
       try {
         setLoading(true);
         const gradeBand = auth.user?.grade_band ?? "low";
@@ -377,7 +642,9 @@ const SurveyPage = () => {
             client.get("/students/me/composite"),
             client.get("/students/me/parent-note"),
           ]);
-
+        if (!isMounted) {
+          return;
+        }
         setConfig(conf);
 
         if (survey?.items) {
@@ -396,12 +663,12 @@ const SurveyPage = () => {
 
         if (comp) {
           setComposite({
-            q1: comp.q1 ?? { 原来: "", 现在: ""  },
-            q2: comp.q2 ?? { 原来: "", 现在: ""  },
+            q1: comp.q1 ?? { 原来: "", 现在: "" },
+            q2: comp.q2 ?? { 原来: "", 现在: "" },
             q3: comp.q3 ?? {},
           });
         } else {
-          setComposite({ q1: { 原来: "", 现在: "" }, q2: { 原来: "", 现在: ""  }, q3: {} });
+          setComposite({ q1: { 原来: "", 现在: "" }, q2: { 原来: "", 现在: "" }, q3: {} });
         }
 
         if (note?.content !== undefined) {
@@ -409,28 +676,63 @@ const SurveyPage = () => {
         } else {
           setParentNote("");
         }
-
         setDirtySurvey(false);
         setDirtyNote(false);
+      } catch (error) {
+        if (isMounted) {
+          toastError("加载问卷数据失败，请稍后重试。");
+          setConfig(null);
+        }
       } finally {
-        setLoading(false);
+        if (isMounted) {
+          setLoading(false);
+        }
       }
     };
 
-    load();
+    fetchData();
+    return () => {
+      isMounted = false;
+    };
   }, [auth.user?.grade_band]);
 
   useEffect(() => {
     const handler = (event: BeforeUnloadEvent) => {
       if (dirtySurvey || dirtyNote) {
         event.preventDefault();
-        event.returnValue = "";
+        event.returnValue = UNSAVED_PROMPT;
       }
     };
 
     window.addEventListener("beforeunload", handler);
     return () => window.removeEventListener("beforeunload", handler);
   }, [dirtySurvey, dirtyNote]);
+
+  useEffect(() => {
+    dirtyRef.current = dirtySurvey || dirtyNote;
+    (window as any).__surveyDirtyGuard = dirtyRef.current;
+    return () => {
+      (window as any).__surveyDirtyGuard = false;
+    };
+  }, [dirtySurvey, dirtyNote]);
+
+  useEffect(() => {
+    const guardState = { __surveyGuard: true };
+    window.history.replaceState(guardState, "", window.location.href);
+
+    const handlePopState = () => {
+      if (dirtyRef.current) {
+        const confirmLeave = window.confirm(UNSAVED_PROMPT);
+        if (!confirmLeave) {
+          window.history.pushState(guardState, "", window.location.href);
+          return;
+        }
+      }
+    };
+
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
 
   const stages = useMemo(() => {
     const question = config?.composite_questions.find((item) => item.key === "q3");
@@ -565,7 +867,7 @@ const SurveyPage = () => {
 
   const goReview = useCallback(() => {
     if (dirtySurvey || dirtyNote) {
-      const ok = window.confirm("是否保存更改？未保存的内容将丢失!");
+      const ok = window.confirm(UNSAVED_PROMPT);
       if (!ok) {
         return;
       }
@@ -575,7 +877,7 @@ const SurveyPage = () => {
 
   const goAi = useCallback(() => {
     if (dirtySurvey || dirtyNote) {
-      const ok = window.confirm("是否保存更改？未保存的内容将丢失!");
+      const ok = window.confirm(UNSAVED_PROMPT);
       if (!ok) {
         return;
       }
@@ -650,4 +952,7 @@ const SurveyPage = () => {
 };
 
 export default SurveyPage;
+
+
+
 
