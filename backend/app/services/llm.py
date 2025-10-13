@@ -177,8 +177,8 @@ def build_llm_payload(
             "category": item.item.major_category if item.item else "",
             "subcategory": item.item.minor_category if item.item else "",
             "prompt": item.item.prompt if item.item else "",
-            "frequency": item.frequency,
-            "skill": item.skill,
+            "frequency": item.frequency or "",
+            "skill": item.skill or "",
             "traits": item.traits,
         }
         for item in survey.items

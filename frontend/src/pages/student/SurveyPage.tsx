@@ -63,7 +63,7 @@ type SurveyConfig = {
   composite_questions: CompositeQuestion[];
 };
 
-const surveyFrequencyOptions = ["每天", "经常", "偶尔"]
+const surveyFrequencyOptions = ["每天", "经常", "偶尔"];
 const frequencyOptions = ["每天", "经常", "偶尔", "从不"];
 const skillOptions = ["熟练", "一般", "不会"];
 const habitOptions = ["完全同意", "比较同意", "部分同意", "不同意"];
@@ -87,11 +87,7 @@ type SurveyContentProps = {
     rowKey: string,
     value: string,
   ) => void;
-  onCompositeScore: (
-    stage: string,
-    metric: string,
-    raw: string,
-  ) => void;
+  onCompositeScore: (stage: string, metric: string, raw: string) => void;
   onSaveSurvey: () => void;
 };
 
@@ -164,7 +160,13 @@ type SurveyRowProps = {
 };
 
 const SurveyRow = memo(
-  ({ row, value, traitsList, onUpdateAnswer, onToggleTrait }: SurveyRowProps) => {
+  ({
+    row,
+    value,
+    traitsList,
+    onUpdateAnswer,
+    onToggleTrait,
+  }: SurveyRowProps) => {
     const currentValue = value ?? EMPTY_ANSWER;
 
     return (
@@ -331,7 +333,6 @@ const SurveyRow = memo(
   },
 );
 
-
 const SurveyContent = memo(
   ({
     config,
@@ -382,7 +383,7 @@ const SurveyContent = memo(
             showMajor,
             showMinor: index === 0,
             majorRowSpan: showMajor
-              ? majorTotals.get(majorKey) ?? section.items.length
+              ? (majorTotals.get(majorKey) ?? section.items.length)
               : 0,
             minorRowSpan: index === 0 ? section.items.length : 0,
           });
@@ -402,23 +403,41 @@ const SurveyContent = memo(
               <Table size="small" sx={{ minWidth: 960 }}>
                 <TableHead>
                   <TableRow>
-                    <TableCell colSpan={3} sx={{ ...columnBorderSx, ...tableMainHeaderSx }}>
+                    <TableCell
+                      colSpan={3}
+                      sx={{ ...columnBorderSx, ...tableMainHeaderSx }}
+                    >
                       劳动项目
                     </TableCell>
-                    <TableCell rowSpan={2} sx={{ ...columnBorderSx, ...tableMainHeaderSx }}>
+                    <TableCell
+                      rowSpan={2}
+                      sx={{ ...columnBorderSx, ...tableMainHeaderSx }}
+                    >
                       参与情况
                     </TableCell>
-                    <TableCell rowSpan={2} sx={{ ...columnBorderSx, ...tableMainHeaderSx }}>
+                    <TableCell
+                      rowSpan={2}
+                      sx={{ ...columnBorderSx, ...tableMainHeaderSx }}
+                    >
                       技能掌握
                     </TableCell>
-                    <TableCell rowSpan={2} sx={{ ...columnBorderSx, ...tableMainHeaderSx }}>
+                    <TableCell
+                      rowSpan={2}
+                      sx={{ ...columnBorderSx, ...tableMainHeaderSx }}
+                    >
                       品格养成（最多选 3 项）
                     </TableCell>
                   </TableRow>
                   <TableRow>
-                    <TableCell sx={{ ...columnBorderSx, ...tableSubHeaderSx }}>大类别</TableCell>
-                    <TableCell sx={{ ...columnBorderSx, ...tableSubHeaderSx }}>细分类别</TableCell>
-                    <TableCell sx={{ ...columnBorderSx, ...tableSubHeaderSx }}>具体劳动项目</TableCell>
+                    <TableCell sx={{ ...columnBorderSx, ...tableSubHeaderSx }}>
+                      大类别
+                    </TableCell>
+                    <TableCell sx={{ ...columnBorderSx, ...tableSubHeaderSx }}>
+                      细分类别
+                    </TableCell>
+                    <TableCell sx={{ ...columnBorderSx, ...tableSubHeaderSx }}>
+                      具体劳动项目
+                    </TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -456,7 +475,9 @@ const SurveyContent = memo(
                     <RadioGroup
                       row
                       value={composite.q1.原来 ?? ""}
-                      onChange={(event) => onCompositeRadio("q1", "原来", event.target.value)}
+                      onChange={(event) =>
+                        onCompositeRadio("q1", "原来", event.target.value)
+                      }
                     >
                       {frequencyOptions.map((option) => (
                         <FormControlLabel
@@ -475,7 +496,9 @@ const SurveyContent = memo(
                     <RadioGroup
                       row
                       value={composite.q1.现在 ?? ""}
-                      onChange={(event) => onCompositeRadio("q1", "现在", event.target.value)}
+                      onChange={(event) =>
+                        onCompositeRadio("q1", "现在", event.target.value)
+                      }
                     >
                       {frequencyOptions.map((option) => (
                         <FormControlLabel
@@ -502,7 +525,9 @@ const SurveyContent = memo(
                     <RadioGroup
                       row
                       value={composite.q2.原来 ?? ""}
-                      onChange={(event) => onCompositeRadio("q2", "原来", event.target.value)}
+                      onChange={(event) =>
+                        onCompositeRadio("q2", "原来", event.target.value)
+                      }
                     >
                       {habitOptions.map((option) => (
                         <FormControlLabel
@@ -521,7 +546,9 @@ const SurveyContent = memo(
                     <RadioGroup
                       row
                       value={composite.q2.现在 ?? ""}
-                      onChange={(event) => onCompositeRadio("q2", "现在", event.target.value)}
+                      onChange={(event) =>
+                        onCompositeRadio("q2", "现在", event.target.value)
+                      }
                     >
                       {habitOptions.map((option) => (
                         <FormControlLabel
@@ -560,23 +587,29 @@ const SurveyContent = memo(
                           {stages.map((stage) => (
                             <TableRow key={stage}>
                               <TableCell>{stage}</TableCell>
-                              {["坚毅担责", "勤劳诚实", "合作智慧"].map((metric) => (
-                                <TableCell key={metric}>
-                                  <TextField
-                                    type="number"
-                                    inputProps={{ min: 0, max: 100 }}
-                                    size="small"
-                                    value={composite.q3[stage]?.[metric] ?? ""}
-                                    onChange={(event: ChangeEvent<HTMLInputElement>) =>
-                                      onCompositeScore(
-                                        stage,
-                                        metric,
-                                        event.target.value,
-                                      )
-                                    }
-                                  />
-                                </TableCell>
-                              ))}
+                              {["坚毅担责", "勤劳诚实", "合作智慧"].map(
+                                (metric) => (
+                                  <TableCell key={metric}>
+                                    <TextField
+                                      type="number"
+                                      inputProps={{ min: 0, max: 100 }}
+                                      size="small"
+                                      value={
+                                        composite.q3[stage]?.[metric] ?? ""
+                                      }
+                                      onChange={(
+                                        event: ChangeEvent<HTMLInputElement>,
+                                      ) =>
+                                        onCompositeScore(
+                                          stage,
+                                          metric,
+                                          event.target.value,
+                                        )
+                                      }
+                                    />
+                                  </TableCell>
+                                ),
+                              )}
                             </TableRow>
                           ))}
                         </TableBody>
@@ -604,7 +637,6 @@ const SurveyContent = memo(
   },
 );
 
-
 SurveyContent.displayName = "SurveyContent";
 
 const SurveyPage = () => {
@@ -624,12 +656,13 @@ const SurveyPage = () => {
   const [parentNote, setParentNote] = useState("");
   const [savingSurvey, setSavingSurvey] = useState(false);
   const [savingNote, setSavingNote] = useState(false);
-const [loadError, setLoadError] = useState<string | null>(null);
-const [dirtySurvey, setDirtySurvey] = useState(false);
-const [dirtyNote, setDirtyNote] = useState(false);
-const dirtyRef = useRef(false);
-const UNSAVED_PROMPT = "检测到问卷信息有修改，请注意保存！";
-const traitsList = config?.traits ?? [];
+  const [checkingAi, setCheckingAi] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [dirtySurvey, setDirtySurvey] = useState(false);
+  const [dirtyNote, setDirtyNote] = useState(false);
+  const dirtyRef = useRef(false);
+  const UNSAVED_PROMPT = "检测到问卷信息有修改，请注意保存！";
+  const traitsList = config?.traits ?? [];
 
   useEffect(() => {
     let isMounted = true;
@@ -637,13 +670,17 @@ const traitsList = config?.traits ?? [];
       try {
         setLoading(true);
         const gradeBand = auth.user?.grade_band ?? "low";
-        const [{ data: conf }, { data: survey }, { data: comp }, { data: note }] =
-          await Promise.all([
-            client.get(`/config/survey?grade_band=${gradeBand}`),
-            client.get("/students/me/survey"),
-            client.get("/students/me/composite"),
-            client.get("/students/me/parent-note"),
-          ]);
+        const [
+          { data: conf },
+          { data: survey },
+          { data: comp },
+          { data: note },
+        ] = await Promise.all([
+          client.get(`/config/survey?grade_band=${gradeBand}`),
+          client.get("/students/me/survey"),
+          client.get("/students/me/composite"),
+          client.get("/students/me/parent-note"),
+        ]);
         if (!isMounted) {
           return;
         }
@@ -653,8 +690,8 @@ const traitsList = config?.traits ?? [];
           const mapped: Record<number, SurveyItemAnswer> = {};
           survey.items.forEach((item: any) => {
             mapped[item.survey_item_id] = {
-              frequency: item.frequency,
-              skill: item.skill,
+              frequency: item.frequency ?? "",
+              skill: item.skill ?? "",
               traits: item.traits ?? [],
             };
           });
@@ -670,7 +707,11 @@ const traitsList = config?.traits ?? [];
             q3: comp.q3 ?? {},
           });
         } else {
-          setComposite({ q1: { 原来: "", 现在: "" }, q2: { 原来: "", 现在: "" }, q3: {} });
+          setComposite({
+            q1: { 原来: "", 现在: "" },
+            q2: { 原来: "", 现在: "" },
+            q3: {},
+          });
         }
 
         if (note?.content !== undefined) {
@@ -737,12 +778,57 @@ const traitsList = config?.traits ?? [];
   }, []);
 
   const stages = useMemo(() => {
-    const question = config?.composite_questions.find((item) => item.key === "q3");
+    const question = config?.composite_questions.find(
+      (item) => item.key === "q3",
+    );
     if (!question?.rows_by_grade) {
       return [];
     }
     return question.rows_by_grade[String(grade)] ?? [];
   }, [config, grade]);
+
+  const ensureSurveyComplete = useCallback(async (): Promise<boolean> => {
+    if (!config) {
+      toastError("问卷配置尚未加载完成，请稍后再试~");
+      return false;
+    }
+    try {
+      const { data: surveyData } = await client.get("/students/me/survey");
+      const expectedIds = new Set<number>();
+      config.sections.forEach((section) => {
+        section.items.forEach((item) => expectedIds.add(item.id));
+      });
+      const expectedCount = expectedIds.size;
+      const answeredItems = surveyData?.items ?? [];
+      if (expectedCount === 0) {
+        return true;
+      }
+      if (!surveyData?.id || answeredItems.length === 0) {
+        toastInfo("请补全问卷信息~");
+        return false;
+      }
+      const answeredMap = new Map<number, (typeof answeredItems)[number]>();
+      let hasEmptyField = false;
+      answeredItems.forEach((item) => {
+        answeredMap.set(item.survey_item_id, item);
+        if (!item.frequency || !item.skill) {
+          hasEmptyField = true;
+        }
+      });
+      const hasMissingItem =
+        expectedCount > 0 &&
+        ([...expectedIds].some((id) => !answeredMap.has(id)) ||
+          answeredMap.size !== expectedCount);
+      if (hasMissingItem || hasEmptyField) {
+        toastInfo("请补全问卷信息~");
+        return false;
+      }
+      return true;
+    } catch (error) {
+      toastError("暂时无法校验问卷信息，请稍后再试~");
+      return false;
+    }
+  }, [config]);
 
   const handleUpdateAnswer = useCallback(
     (itemId: number, partial: Partial<SurveyItemAnswer>) => {
@@ -835,16 +921,52 @@ const traitsList = config?.traits ?? [];
     setSavingSurvey(true);
     try {
       const payload = Object.entries(answers)
-        .filter(([_, value]) => value.frequency && value.skill)
+        .filter(
+          ([_, value]) =>
+            value.frequency ||
+            value.skill ||
+            (value.traits && value.traits.length > 0),
+        )
         .map(([id, value]) => ({
           survey_item_id: Number(id),
-          frequency: value.frequency,
-          skill: value.skill,
+          frequency: value.frequency || null,
+          skill: value.skill || null,
           traits: value.traits,
         }));
 
-      await client.put("/students/me/survey", { items: payload });
-      await client.put("/students/me/composite", composite);
+      const { data: savedSurvey } = await client.put("/students/me/survey", {
+        items: payload,
+      });
+      const { data: savedComposite } = await client.put(
+        "/students/me/composite",
+        composite,
+      );
+
+      if (savedSurvey?.items) {
+        const syncedAnswers: Record<number, SurveyItemAnswer> = {};
+        savedSurvey.items.forEach(
+          (item: {
+            survey_item_id: number;
+            frequency: string | null;
+            skill: string | null;
+            traits: string[];
+          }) => {
+            syncedAnswers[item.survey_item_id] = {
+              frequency: item.frequency ?? "",
+              skill: item.skill ?? "",
+              traits: item.traits ?? [],
+            };
+          },
+        );
+        setAnswers(syncedAnswers);
+      }
+      if (savedComposite) {
+        setComposite({
+          q1: savedComposite.q1 ?? { 原来: "", 现在: "" },
+          q2: savedComposite.q2 ?? { 原来: "", 现在: "" },
+          q3: savedComposite.q3 ?? {},
+        });
+      }
       toastSuccess("问卷信息已保存");
       setDirtySurvey(false);
     } finally {
@@ -872,6 +994,10 @@ const traitsList = config?.traits ?? [];
       const ok = window.confirm(UNSAVED_PROMPT);
       if (!ok) return;
     }
+    const surveyOk = await ensureSurveyComplete();
+    if (!surveyOk) {
+      return;
+    }
     try {
       await client.get("/students/me/teacher-review");
       navigate("/student/review");
@@ -879,20 +1005,58 @@ const traitsList = config?.traits ?? [];
       const message =
         error?.response?.status === 404
           ? "老师还未对你做出评价哦，请耐心等待~"
-          : error?.response?.data?.detail ?? "暂时无法查看教师评价";
+          : (error?.response?.data?.detail ?? "暂时无法查看教师评价");
       toastInfo(message);
     }
-  }, [dirtySurvey, dirtyNote, navigate]);
+  }, [dirtySurvey, dirtyNote, navigate, ensureSurveyComplete]);
 
-  const goAi = useCallback(() => {
+  const goAi = useCallback(async () => {
     if (dirtySurvey || dirtyNote) {
       const ok = window.confirm(UNSAVED_PROMPT);
+
       if (!ok) {
         return;
       }
     }
-    navigate("/student/ai");
-  }, [dirtySurvey, dirtyNote, navigate]);
+
+    setCheckingAi(true);
+
+    try {
+      const surveyOk = await ensureSurveyComplete();
+
+      if (!surveyOk) {
+        return;
+      }
+
+      const { data: noteData } = await client.get("/students/me/parent-note");
+
+      const parentContent = (noteData?.content ?? "").trim();
+
+      if (!parentContent) {
+        toastInfo("请先填写家长寄语~");
+
+        return;
+      }
+
+      try {
+        await client.get("/students/me/teacher-review");
+      } catch (error: any) {
+        if (error?.response?.status === 404) {
+          toastInfo("老师还未对你做出评价哦，请耐心等待~");
+
+          return;
+        }
+
+        throw error;
+      }
+
+      navigate("/student/ai");
+    } catch (error) {
+      toastError("暂时无法查看彩小蝶的综合评语, 请稍后再试~");
+    } finally {
+      setCheckingAi(false);
+    }
+  }, [dirtySurvey, dirtyNote, navigate, UNSAVED_PROMPT, ensureSurveyComplete]);
 
   if (loading || !config) {
     return (
@@ -948,9 +1112,12 @@ const traitsList = config?.traits ?? [];
                 {savingNote ? "保存中..." : "保存家长寄语"}
               </Button>
               <Button variant="outlined" onClick={goReview}>
-                查看老师对你的评价              </Button>
-              <Button variant="outlined" onClick={goAi}>
-                查看彩小蝶对你的综合评语
+                查看老师对你的评价
+              </Button>
+              <Button variant="outlined" onClick={goAi} disabled={checkingAi}>
+                {checkingAi
+                  ? "\u68c0\u67e5\u4e2d..."
+                  : "\u67e5\u770b\u5f69\u5c0f\u8776\u5bf9\u4f60\u7684\u7efc\u5408\u8bc4\u8bed"}
               </Button>
             </Stack>
           </Stack>
@@ -961,7 +1128,3 @@ const traitsList = config?.traits ?? [];
 };
 
 export default SurveyPage;
-
-
-
-

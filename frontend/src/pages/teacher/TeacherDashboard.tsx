@@ -32,11 +32,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 import client from "../../api/client";
 import { useAuthStore } from "../../store/auth";
-import {
-  toastError,
-  toastInfo,
-  toastSuccess,
-} from "../../components/toast";
+import { toastError, toastInfo, toastSuccess } from "../../components/toast";
 
 type StudentItem = {
   student_id: string;
@@ -109,8 +105,9 @@ const TeacherDashboard = () => {
   const [detail, setDetail] = useState<StudentDetail | null>(null);
   const [config, setConfig] = useState<SurveyConfig | null>(null);
   const [answers, setAnswers] = useState<Record<number, SurveyAnswer>>({});
-  const [originalAnswers, setOriginalAnswers] =
-    useState<Record<number, SurveyAnswer>>({});
+  const [originalAnswers, setOriginalAnswers] = useState<
+    Record<number, SurveyAnswer>
+  >({});
   const [selectedTraits, setSelectedTraits] = useState<string[]>([]);
   const [lockStatus, setLockStatus] = useState(false);
   const [loadingDetail, setLoadingDetail] = useState(false);
@@ -148,9 +145,7 @@ const TeacherDashboard = () => {
 
   const dirtyReview = useMemo(() => {
     const original = detail?.teacher_review?.selected_traits ?? [];
-    return (
-      selectedTraits.sort().join(",") !== original.sort().join(",")
-    );
+    return selectedTraits.sort().join(",") !== original.sort().join(",");
   }, [detail?.teacher_review?.selected_traits, selectedTraits]);
 
   const fetchStudents = useCallback(async () => {
@@ -208,9 +203,7 @@ const TeacherDashboard = () => {
       setDetail(data);
       setLockStatus(data.lock?.is_locked ?? false);
       const gradeBand = data.student.grade_band ?? "low";
-      const conf = await client.get(
-        `/config/survey?grade_band=${gradeBand}`,
-      );
+      const conf = await client.get(`/config/survey?grade_band=${gradeBand}`);
       setConfig(conf.data);
       const mapped: Record<number, SurveyAnswer> = {};
       data.survey?.items?.forEach((item: any) => {
@@ -222,9 +215,7 @@ const TeacherDashboard = () => {
       });
       setAnswers(mapped);
       setOriginalAnswers(mapped);
-      setSelectedTraits(
-        data.teacher_review?.selected_traits ?? [],
-      );
+      setSelectedTraits(data.teacher_review?.selected_traits ?? []);
     } finally {
       setLoadingDetail(false);
     }
@@ -243,8 +234,7 @@ const TeacherDashboard = () => {
 
   const updateAnswer = (itemId: number, partial: Partial<SurveyAnswer>) => {
     setAnswers((prev) => {
-      const existing =
-        prev[itemId] ?? { frequency: "", skill: "", traits: [] };
+      const existing = prev[itemId] ?? { frequency: "", skill: "", traits: [] };
       return {
         ...prev,
         [itemId]: {
@@ -257,8 +247,7 @@ const TeacherDashboard = () => {
 
   const toggleTrait = (itemId: number, trait: string) => {
     setAnswers((prev) => {
-      const existing =
-        prev[itemId] ?? { frequency: "", skill: "", traits: [] };
+      const existing = prev[itemId] ?? { frequency: "", skill: "", traits: [] };
       let traits = existing.traits ?? [];
       if (traits.includes(trait)) {
         traits = traits.filter((t) => t !== trait);
@@ -289,11 +278,16 @@ const TeacherDashboard = () => {
     setSavingSurvey(true);
     try {
       const items = Object.entries(answers)
-        .filter(([_id, value]) => value.frequency && value.skill)
+        .filter(
+          ([_id, value]) =>
+            value.frequency ||
+            value.skill ||
+            (value.traits && value.traits.length > 0),
+        )
         .map(([id, value]) => ({
           survey_item_id: Number(id),
-          frequency: value.frequency,
-          skill: value.skill,
+          frequency: value.frequency || null,
+          skill: value.skill || null,
           traits: value.traits,
         }));
       const { data } = await client.put(
@@ -304,8 +298,8 @@ const TeacherDashboard = () => {
       const updated: Record<number, SurveyAnswer> = {};
       data.items.forEach((item: any) => {
         updated[item.survey_item_id] = {
-          frequency: item.frequency,
-          skill: item.skill,
+          frequency: item.frequency ?? "",
+          skill: item.skill ?? "",
           traits: item.traits ?? [],
         };
       });
@@ -389,7 +383,8 @@ const TeacherDashboard = () => {
               variant="outlined"
               onClick={handleLogout}
             >
-              退出系统            </Button>
+              退出系统{" "}
+            </Button>
           </Stack>
         </Toolbar>
       </AppBar>
@@ -449,13 +444,12 @@ const TeacherDashboard = () => {
                           {detail.student.student_name}
                         </Typography>
                         <Typography color="text.secondary">
-                          {detail.student.grade}年级{detail.student.class_no}班                        </Typography>
+                          {detail.student.grade}年级{detail.student.class_no}
+                          班{" "}
+                        </Typography>
                       </Box>
                       <Stack direction="row" spacing={2}>
-                        <Button
-                          variant="outlined"
-                          onClick={handleReturnList}
-                        >
+                        <Button variant="outlined" onClick={handleReturnList}>
                           返回查看班级列表
                         </Button>
                         <FormControlLabel
@@ -476,7 +470,8 @@ const TeacherDashboard = () => {
                     <Card>
                       <CardContent>
                         <Typography variant="h6" fontWeight={600} mb={2}>
-                          学生自评表                        </Typography>
+                          学生自评表{" "}
+                        </Typography>
                         <Table size="small">
                           <TableHead>
                             <TableRow>
@@ -489,12 +484,11 @@ const TeacherDashboard = () => {
                           <TableBody>
                             {config.sections.map((section) =>
                               section.items.map((item) => {
-                                const value =
-                                  answers[item.id] ?? {
-                                    frequency: "",
-                                    skill: "",
-                                    traits: [],
-                                  };
+                                const value = answers[item.id] ?? {
+                                  frequency: "",
+                                  skill: "",
+                                  traits: [],
+                                };
                                 return (
                                   <TableRow key={item.id}>
                                     <TableCell>
@@ -585,9 +579,7 @@ const TeacherDashboard = () => {
                             onClick={saveSurvey}
                             disabled={!dirtySurvey || savingSurvey}
                           >
-                            {savingSurvey
-                              ? "保存中..."
-                              : "确认保存修改"}
+                            {savingSurvey ? "保存中..." : "确认保存修改"}
                           </Button>
                         </Stack>
                       </CardContent>
@@ -641,10 +633,7 @@ const TeacherDashboard = () => {
                           >
                             {savingReview ? "保存中.." : "保存"}
                           </Button>
-                          <Button
-                            variant="outlined"
-                            onClick={handleReturnList}
-                          >
+                          <Button variant="outlined" onClick={handleReturnList}>
                             返回查看班级列表
                           </Button>
                         </Stack>
@@ -660,7 +649,8 @@ const TeacherDashboard = () => {
                 minHeight="50vh"
               >
                 <Typography color="text.secondary">
-                  请选择一位学生查看详情                </Typography>
+                  请选择一位学生查看详情{" "}
+                </Typography>
               </Stack>
             )}
           </Grid>

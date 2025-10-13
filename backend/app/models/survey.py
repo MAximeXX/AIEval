@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+﻿# -*- coding: utf-8 -*-
 from __future__ import annotations
 
 import uuid
@@ -107,8 +107,8 @@ class SurveyResponseItem(Base):
         ForeignKey("survey_items.id", ondelete="CASCADE"),
         nullable=False,
     )
-    frequency: Mapped[str] = mapped_column(String(32), nullable=False)
-    skill: Mapped[str] = mapped_column(String(32), nullable=False)
+    frequency: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    skill: Mapped[str | None] = mapped_column(String(32), nullable=True)
     traits: Mapped[list[str]] = mapped_column(ARRAY(String()), default=list)
 
     response: Mapped[SurveyResponse] = relationship(back_populates="items")

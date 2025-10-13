@@ -1,15 +1,15 @@
-# -*- coding: utf-8 -*-
+﻿# -*- coding: utf-8 -*-
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Literal
+from typing import Literal, Optional
 from uuid import UUID
 
 from pydantic import BaseModel, Field
 
 
-FrequencyLiteral = Literal["每天", "经常", "偶尔", "从不"]
-SkillLiteral = Literal["熟练", "一般", "不会"]
+FrequencyLiteral = Literal["每天", "经常", "偶尔", "从不", ""]
+SkillLiteral = Literal["熟练", "一般", "不会", ""]
 HabitLiteral = Literal["完全同意", "比较同意", "部分同意", "不同意"]
 
 
@@ -24,8 +24,8 @@ class SurveyItemSchema(BaseModel):
 
 class SurveyResponseItemIn(BaseModel):
     survey_item_id: int
-    frequency: FrequencyLiteral
-    skill: SkillLiteral
+    frequency: FrequencyLiteral | None = None
+    skill: SkillLiteral | None = None
     traits: list[str] = Field(default_factory=list, max_length=3)
 
 

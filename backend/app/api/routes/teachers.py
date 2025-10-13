@@ -281,8 +281,8 @@ async def teacher_override_survey(
         response.items.append(
             SurveyResponseItem(
                 survey_item_id=survey_item.id,
-                frequency=item.frequency,
-                skill=item.skill,
+                frequency=item.frequency or "",
+                skill=item.skill or "",
                 traits=item.traits,
             )
         )

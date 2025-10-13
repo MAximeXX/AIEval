@@ -128,35 +128,33 @@ async def put_my_survey(
         db.add(response)
         await db.flush()
 
-    if len(payload.items) == 0:
-        await db.execute(
-            delete(SurveyResponseItem).where(
-                SurveyResponseItem.response_id == response.id
-            )
+    await db.execute(
+        delete(SurveyResponseItem).where(
+            SurveyResponseItem.response_id == response.id
         )
-        response.items = []
-    else:
-        await db.execute(
-            delete(SurveyResponseItem).where(
-                SurveyResponseItem.response_id == response.id
-            )
-        )
+    )
+
+    if payload.items:
         items_map = await _fetch_items_map(db, payload.items)
+        new_items: list[SurveyResponseItem] = []
         for item_payload in payload.items:
             survey_item = items_map.get(item_payload.survey_item_id)
             if not survey_item:
                 raise HTTPException(status_code=404, detail="题目不存在")
-            response.items.append(
+            new_items.append(
                 SurveyResponseItem(
+                    response_id=response.id,
                     survey_item_id=survey_item.id,
-                    frequency=item_payload.frequency,
-                    skill=item_payload.skill,
+                    frequency=item_payload.frequency or "",
+                    skill=item_payload.skill or "",
                     traits=item_payload.traits,
                 )
             )
+        db.add_all(new_items)
 
     response.updated_at = datetime.now(timezone.utc)
     await db.flush()
+    await db.refresh(response, attribute_names=["items"])
     await touch_completion(db, current_user.id, student_submitted=bool(response.items))
     await db.commit()
 
