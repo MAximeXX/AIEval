@@ -1,4 +1,4 @@
-import {
+﻿import {
   AppBar,
   Box,
   Button,
@@ -157,6 +157,31 @@ const TeacherDashboard = () => {
     fetchStudents();
   }, [fetchStudents]);
 
+  const loadDetail = useCallback(async (studentId: string) => {
+    setLoadingDetail(true);
+    try {
+      const { data } = await client.get(`/teacher/students/${studentId}`);
+      setDetail(data);
+      setLockStatus(data.lock?.is_locked ?? false);
+      const gradeBand = data.student.grade_band ?? "low";
+      const conf = await client.get(`/config/survey?grade_band=${gradeBand}`);
+      setConfig(conf.data);
+      const mapped: Record<number, SurveyAnswer> = {};
+      data.survey?.items?.forEach((item: any) => {
+        mapped[item.survey_item_id] = {
+          frequency: item.frequency ?? "",
+          skill: item.skill ?? "",
+          traits: item.traits ?? [],
+        };
+      });
+      setAnswers(mapped);
+      setOriginalAnswers(mapped);
+      setSelectedTraits(data.teacher_review?.selected_traits ?? []);
+    } finally {
+      setLoadingDetail(false);
+    }
+  }, []);
+
   useEffect(() => {
     if (!auth.user?.school_name || !auth.user?.class_no) {
       return undefined;
@@ -195,31 +220,6 @@ const TeacherDashboard = () => {
     clearAuth();
     window.location.href = "/login";
   };
-
-  const loadDetail = useCallback(async (studentId: string) => {
-    setLoadingDetail(true);
-    try {
-      const { data } = await client.get(`/teacher/students/${studentId}`);
-      setDetail(data);
-      setLockStatus(data.lock?.is_locked ?? false);
-      const gradeBand = data.student.grade_band ?? "low";
-      const conf = await client.get(`/config/survey?grade_band=${gradeBand}`);
-      setConfig(conf.data);
-      const mapped: Record<number, SurveyAnswer> = {};
-      data.survey?.items?.forEach((item: any) => {
-        mapped[item.survey_item_id] = {
-          frequency: item.frequency,
-          skill: item.skill,
-          traits: item.traits ?? [],
-        };
-      });
-      setAnswers(mapped);
-      setOriginalAnswers(mapped);
-      setSelectedTraits(data.teacher_review?.selected_traits ?? []);
-    } finally {
-      setLoadingDetail(false);
-    }
-  }, []);
 
   const handleSelectStudent = (studentId: string) => {
     if (dirtySurvey || dirtyReview) {
@@ -366,7 +366,7 @@ const TeacherDashboard = () => {
 
   return (
     <Box sx={{ backgroundColor: "#fef5ef", minHeight: "100vh" }}>
-      <AppBar position="sticky" color="transparent" elevation={0}>
+      <AppBar position="static" color="transparent" elevation={0}>
         <Toolbar sx={{ justifyContent: "space-between" }}>
           <Stack direction="row" spacing={1} alignItems="center">
             <EmojiNatureIcon color="primary" />
