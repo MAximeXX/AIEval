@@ -1,4 +1,4 @@
-﻿import React, {
+import React, {
   ChangeEvent,
   memo,
   useCallback,
@@ -61,6 +61,19 @@ type SurveyConfig = {
   traits: string[];
   sections: SurveySection[];
   composite_questions: CompositeQuestion[];
+};
+
+type StudentSurveyItem = {
+  id: number;
+  survey_item_id: number;
+  frequency: string | null;
+  skill: string | null;
+  traits: string[];
+};
+
+type StudentSurveyResponse = {
+  id: string | null;
+  items: StudentSurveyItem[];
 };
 
 const surveyFrequencyOptions = ["每天", "经常", "偶尔"];
@@ -562,59 +575,57 @@ const SurveyContent = memo(
                   </Box>
                 </Stack>
               </Box>
-              {!isFirstGrade && (
+              {!isFirstGrade && stages.length > 0 && (
                 <>
                   <Divider />
                   <Box>
                     <Typography fontWeight={600} mb={1}>
                       3、请为你在这次劳动计划中表现出的品质打个分吧（0-100）！
                     </Typography>
-                    {stages.length === 0 ? (
-                      <Typography color="text.secondary">
-                        当前年级暂无阶段数据，可跳过此项
-                      </Typography>
-                    ) : (
-                      <Table size="small">
-                        <TableHead>
-                          <TableRow>
-                            <TableCell>阶段</TableCell>
-                            <TableCell>坚毅担责</TableCell>
-                            <TableCell>勤劳诚实</TableCell>
-                            <TableCell>合作智慧</TableCell>
+                    <Table size="small">
+                      <TableHead>
+                        <TableRow>
+                          <TableCell>阶段</TableCell>
+                          <TableCell>坚毅担责</TableCell>
+                          <TableCell>勤劳诚实</TableCell>
+                          <TableCell>合作智慧</TableCell>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {stages.map((stage) => (
+                          <TableRow key={stage}>
+                            <TableCell>{stage}</TableCell>
+                            {["坚毅担责", "勤劳诚实", "合作智慧"].map((metric) => (
+                              <TableCell key={metric}>
+                                <TextField
+                                  type="number"
+                                  inputProps={{
+                                    min: 0,
+                                    max: 100,
+                                    inputMode: "numeric",
+                                    pattern: "[0-9]*",
+                                  }}
+                                  size="small"
+                                  sx={{
+                                    '& input[type="number"]': {
+                                      MozAppearance: "textfield",
+                                    },
+                                    '& input[type="number"]::-webkit-outer-spin-button, & input[type="number"]::-webkit-inner-spin-button': {
+                                      WebkitAppearance: "none",
+                                      margin: 0,
+                                    },
+                                  }}
+                                  value={composite.q3[stage]?.[metric] ?? ""}
+                                  onChange={(event: ChangeEvent<HTMLInputElement>) =>
+                                    onCompositeScore(stage, metric, event.target.value)
+                                  }
+                                />
+                              </TableCell>
+                            ))}
                           </TableRow>
-                        </TableHead>
-                        <TableBody>
-                          {stages.map((stage) => (
-                            <TableRow key={stage}>
-                              <TableCell>{stage}</TableCell>
-                              {["坚毅担责", "勤劳诚实", "合作智慧"].map(
-                                (metric) => (
-                                  <TableCell key={metric}>
-                                    <TextField
-                                      type="number"
-                                      inputProps={{ min: 0, max: 100 }}
-                                      size="small"
-                                      value={
-                                        composite.q3[stage]?.[metric] ?? ""
-                                      }
-                                      onChange={(
-                                        event: ChangeEvent<HTMLInputElement>,
-                                      ) =>
-                                        onCompositeScore(
-                                          stage,
-                                          metric,
-                                          event.target.value,
-                                        )
-                                      }
-                                    />
-                                  </TableCell>
-                                ),
-                              )}
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    )}
+                        ))}
+                      </TableBody>
+                    </Table>
                   </Box>
                 </>
               )}
@@ -793,7 +804,9 @@ const SurveyPage = () => {
       return false;
     }
     try {
-      const { data: surveyData } = await client.get("/students/me/survey");
+      const { data: surveyData } = await client.get<StudentSurveyResponse>(
+        "/students/me/survey",
+      );
       const expectedIds = new Set<number>();
       config.sections.forEach((section) => {
         section.items.forEach((item) => expectedIds.add(item.id));

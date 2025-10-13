@@ -23,6 +23,8 @@ from app.models.survey import (
 )
 from app.models.user import GradeBand, User, UserRole
 from app.schemas.survey import (
+    CompositeResponseIn,
+    CompositeResponseOut,
     LockStatusIn,
     LockStatusOut,
     ParentNoteOut,
@@ -79,6 +81,7 @@ async def list_students(
             StudentDashboardItem(
                 student_id=stu.id,
                 student_name=stu.student_name or stu.username,
+                student_no=stu.student_no or "",
                 class_no=stu.class_no or "",
                 grade=stu.grade or 0,
                 grade_band=stu.grade_band.value if stu.grade_band else "",
@@ -416,4 +419,59 @@ async def submit_review(
         rendered_text=review.rendered_text,
         submitted_at=review.submitted_at,
         updated_at=review.updated_at,
+    )
+
+
+@router.put(
+    "/students/{student_id}/composite",
+    response_model=CompositeResponseOut,
+    summary="教师调整综合问题",
+)
+async def teacher_update_composite(
+    student_id: UUID,
+    payload: CompositeResponseIn,
+    current_user: User = Depends(get_current_teacher),
+    db: AsyncSession = Depends(get_db),
+) -> CompositeResponseOut:
+    student = await db.get(User, student_id)
+    if not student:
+        raise HTTPException(status_code=404, detail="用户不存在")
+    await _ensure_same_class(current_user, student)
+
+    stmt = select(CompositeResponse).where(
+        CompositeResponse.student_id == student_id,
+        CompositeResponse.responder_type == ResponderType.STUDENT,
+    )
+    result = await db.execute(stmt)
+    composite = result.scalar_one_or_none()
+    now = datetime.now(timezone.utc)
+    payload_data = payload.model_dump()
+    if not composite:
+        composite = CompositeResponse(
+            student_id=student_id,
+            responder_type=ResponderType.STUDENT,
+            payload=payload_data,
+            submitted_at=now,
+            updated_at=now,
+        )
+        db.add(composite)
+    else:
+        composite.payload = payload_data
+        composite.updated_at = now
+    await db.flush()
+    await touch_completion(db, student_id, student_submitted=True)
+    await db.commit()
+
+    await manager.notify_student(
+        student_id,
+        {"event": "composite_overridden", "by": str(current_user.id)},
+    )
+    await manager.broadcast_to_teacher(
+        _class_key(student),
+        {"event": "composite_updated", "student_id": str(student_id)},
+    )
+    return CompositeResponseOut(
+        **payload_data,
+        submitted_at=composite.submitted_at,
+        updated_at=composite.updated_at,
     )

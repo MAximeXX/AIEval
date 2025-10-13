@@ -1,4 +1,4 @@
-﻿import { Box, Button, Container, Stack, Typography } from "@mui/material";
+import { Box, Button, Container, Stack, Typography } from "@mui/material";
 import LogoutIcon from "@mui/icons-material/Logout";
 import EmojiNatureIcon from "@mui/icons-material/EmojiNature";
 import { useEffect } from "react";
@@ -27,7 +27,7 @@ const StudentLayout = ({ children }: Props) => {
         const payload = JSON.parse(event.data);
         if (payload.event === "lock_changed") {
           if (payload.is_locked) {
-            toastError("表格数据已被锁定，无法更改");
+            toastError("表格数据已被锁定，无法更改~");
           } else {
             toastInfo("老师已解锁，可以继续编辑啦~");
           }
@@ -54,7 +54,7 @@ const StudentLayout = ({ children }: Props) => {
       // ignore
     }
     clear();
-    toastInfo("已退出系统，期待再次与您相遇！");
+    toastInfo("已退出系统，期待再次与你相遇~");
     navigate("/login", { replace: true });
   };
 
