@@ -32,7 +32,7 @@ import { useNavigate } from "react-router-dom";
 
 import client from "../../api/client";
 import { useAuthStore } from "../../store/auth";
-import { toastError, toastSuccess } from "../../components/toast";
+import { toastError, toastInfo, toastSuccess } from "../../components/toast";
 
 type SurveyItemAnswer = {
   frequency: string;
@@ -63,6 +63,7 @@ type SurveyConfig = {
   composite_questions: CompositeQuestion[];
 };
 
+const surveyFrequencyOptions = ["每天", "经常", "偶尔"]
 const frequencyOptions = ["每天", "经常", "偶尔", "从不"];
 const skillOptions = ["熟练", "一般", "不会"];
 const habitOptions = ["完全同意", "比较同意", "部分同意", "不同意"];
@@ -229,7 +230,7 @@ const SurveyRow = memo(
               justifyContent: "center",
             }}
           >
-            {frequencyOptions.map((option) => (
+            {surveyFrequencyOptions.map((option) => (
               <FormControlLabel
                 key={option}
                 value={option}
@@ -623,6 +624,7 @@ const SurveyPage = () => {
   const [parentNote, setParentNote] = useState("");
   const [savingSurvey, setSavingSurvey] = useState(false);
   const [savingNote, setSavingNote] = useState(false);
+const [loadError, setLoadError] = useState<string | null>(null);
 const [dirtySurvey, setDirtySurvey] = useState(false);
 const [dirtyNote, setDirtyNote] = useState(false);
 const dirtyRef = useRef(false);
@@ -865,14 +867,21 @@ const traitsList = config?.traits ?? [];
     }
   }, [parentNote]);
 
-  const goReview = useCallback(() => {
+  const goReview = useCallback(async () => {
     if (dirtySurvey || dirtyNote) {
       const ok = window.confirm(UNSAVED_PROMPT);
-      if (!ok) {
-        return;
-      }
+      if (!ok) return;
     }
-    navigate("/student/review");
+    try {
+      await client.get("/students/me/teacher-review");
+      navigate("/student/review");
+    } catch (error: any) {
+      const message =
+        error?.response?.status === 404
+          ? "老师还未对你做出评价哦，请耐心等待~"
+          : error?.response?.data?.detail ?? "暂时无法查看教师评价";
+      toastInfo(message);
+    }
   }, [dirtySurvey, dirtyNote, navigate]);
 
   const goAi = useCallback(() => {

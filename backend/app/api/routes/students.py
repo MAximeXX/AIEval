@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import delete, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -367,6 +367,18 @@ async def post_llm_eval(
     )
     if not survey or not survey.items:
         raise HTTPException(status_code=400, detail="请先完成问卷提交")
+
+    expected_items_stmt = await db.execute(
+        select(func.count(SurveyItem.id)).where(
+            SurveyItem.grade_band == survey.grade_band
+        )
+    )
+    expected_items = expected_items_stmt.scalar_one()
+    answered_items = len(survey.items)
+    if answered_items != expected_items:
+        raise HTTPException(status_code=400, detail="请完整填写全部问卷题目后再生成评价")
+    if any(not item.frequency or not item.skill for item in survey.items):
+        raise HTTPException(status_code=400, detail="请完整填写全部问卷题目后再生成评价")
 
     parent_note = await _get_parent_note(db, current_user.id)
     if not parent_note:
