@@ -1,12 +1,4 @@
-import {
-  AppBar,
-  Box,
-  Button,
-  Container,
-  Stack,
-  Toolbar,
-  Typography,
-} from "@mui/material";
+import { Box, Button, Container, Stack, Typography } from "@mui/material";
 import LogoutIcon from "@mui/icons-material/Logout";
 import EmojiNatureIcon from "@mui/icons-material/EmojiNature";
 import { useEffect } from "react";
@@ -62,31 +54,41 @@ const StudentLayout = ({ children }: Props) => {
 
   return (
     <Box sx={{ minHeight: "100vh", backgroundColor: "#fff7f0" }}>
-      <AppBar position="sticky" color="transparent" elevation={0} sx={{ py: 1 }}>
-        <Toolbar sx={{ display: "flex", justifyContent: "space-between" }}>
-          <Stack direction="row" spacing={1} alignItems="center">
-            <EmojiNatureIcon color="primary" />
-            <Typography variant="h6" color="primary" fontWeight={700}>
-              小彩蝶劳动益美行评测
-            </Typography>
-          </Stack>
-          <Stack direction="row" spacing={2} alignItems="center">
-            <Typography color="text.secondary">
-              欢迎你，{user?.student_name ?? user?.username} 同学
-            </Typography>
-            <Button
-              startIcon={<LogoutIcon />}
-              color="primary"
-              variant="outlined"
-              onClick={handleLogout}
-            >
-              退出系统
-            </Button>
-          </Stack>
-        </Toolbar>
-      </AppBar>
       <Container maxWidth="lg" sx={{ py: 4 }}>
-        {children}
+        <Stack spacing={4}>
+          <Stack
+            direction={{ xs: "column", md: "row" }}
+            alignItems={{ xs: "flex-start", md: "center" }}
+            justifyContent="space-between"
+            spacing={2}
+          >
+            <Stack direction="row" spacing={1} alignItems="center">
+              <EmojiNatureIcon color="primary" />
+              <Typography variant="h6" color="primary" fontWeight={700}>
+                小彩蝶劳动益美行评测
+              </Typography>
+            </Stack>
+            <Stack
+              direction={{ xs: "column", sm: "row" }}
+              alignItems={{ xs: "flex-start", sm: "center" }}
+              spacing={1.5}
+            >
+              <Typography color="text.secondary">
+                欢迎你，{user?.student_name ?? user?.username} 同学
+              </Typography>
+              <Button
+                startIcon={<LogoutIcon />}
+                color="primary"
+                variant="outlined"
+                onClick={handleLogout}
+              >
+                退出系统
+              </Button>
+            </Stack>
+          </Stack>
+
+          <Box>{children}</Box>
+        </Stack>
       </Container>
     </Box>
   );
