@@ -9,7 +9,7 @@ const WelcomePage = () => {
   const user = useAuthStore((state) => state.user);
   const targetText = useMemo(() => {
     const studentName = user?.student_name ?? user?.username ?? "";
-    const greeting = `亲爱的${studentName}同学`;
+    const greeting = `🦋亲爱的${studentName}同学`;
     const message =
       "欢迎来到小彩蝶劳动益美行评测环节，一起来看看经历了小彩蝶劳动计划的你有哪些成长吧！";
     return `${greeting}\n${message}`;

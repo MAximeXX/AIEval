@@ -410,7 +410,7 @@ const SurveyContent = memo(
         <Card>
           <CardContent>
             <Typography variant="h6" fontWeight={600} mb={2}>
-              学生自评表
+              📑学生自评表
             </Typography>
             <Box sx={{ overflowX: "auto" }}>
               <Table size="small" sx={{ minWidth: 960 }}>
@@ -473,7 +473,7 @@ const SurveyContent = memo(
         <Card>
           <CardContent>
             <Typography variant="h6" fontWeight={600} mb={2}>
-              综合问题
+              💡综合问题
             </Typography>
             <Stack spacing={3}>
               <Box>
@@ -1100,7 +1100,7 @@ const SurveyPage = () => {
       <Card>
         <CardContent>
           <Typography variant="h6" fontWeight={600} mb={2}>
-            家长寄语
+            👨‍👩‍👧‍👦家长寄语
           </Typography>
           <Stack spacing={2}>
             <TextField
@@ -1125,7 +1125,7 @@ const SurveyPage = () => {
                 {savingNote ? "保存中..." : "保存家长寄语"}
               </Button>
               <Button variant="outlined" onClick={goReview}>
-                查看老师对你的评价
+                👩‍🏫查看老师对你的评价
               </Button>
               <Button variant="outlined" onClick={goAi} disabled={checkingAi}>
                 {checkingAi

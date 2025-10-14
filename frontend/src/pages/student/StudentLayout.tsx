@@ -80,7 +80,7 @@ const StudentLayout = ({ children }: Props) => {
               spacing={1.5}
             >
               <Typography color="text.secondary">
-                欢迎你，{user?.student_name ?? user?.username} 同学
+                😊欢迎你，{user?.student_name ?? user?.username} 同学
               </Typography>
               <Button
                 startIcon={<LogoutIcon />}
