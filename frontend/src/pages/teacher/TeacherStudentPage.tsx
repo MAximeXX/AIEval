@@ -11,7 +11,6 @@ import {
   Radio,
   RadioGroup,
   Stack,
-  Switch,
   Table,
   TableBody,
   TableCell,
@@ -64,11 +63,6 @@ type SurveyConfig = {
   composite_questions: CompositeQuestion[];
 };
 
-type TeacherReview = {
-  selected_traits: string[];
-  rendered_text: string;
-};
-
 type TeacherStudentDetail = {
   student: {
     id: string;
@@ -102,7 +96,6 @@ type TeacherStudentDetail = {
         submitted_at: string;
       }
     | null;
-  teacher_review: TeacherReview | null;
   lock: {
     is_locked: boolean;
     updated_at?: string;
@@ -110,9 +103,9 @@ type TeacherStudentDetail = {
 };
 
 const surveyFrequencyOptions = ["每天", "经常", "偶尔"];
-const frequencyOptions = ["每天", "经常", "偶尔", "几乎不"];
-const skillOptions = ["熟练", "一般", "需要帮助"];
-const habitOptions = ["完全同意", "比较同意", "基本不同意", "不同意"];
+const frequencyOptions = ["每天", "经常", "偶尔", "从不"];
+const skillOptions = ["熟练", "一般", "不会"];
+const habitOptions = ["完全同意", "比较同意", "部分同意", "不同意"];
 const metricLabels = ["劳动最棒", "动手真棒", "劳动形象佳"];
 
 type StructuredRow = {
@@ -421,7 +414,7 @@ const TeacherSurveyContent = memo(
         <Card>
           <CardContent>
             <Typography variant="h6" fontWeight={600} mb={2}>
-              学生问卷
+              📑学生自评表
             </Typography>
             <Box sx={{ overflowX: "auto" }}>
               <Table size="small" sx={{ minWidth: 960 }}>
@@ -431,24 +424,24 @@ const TeacherSurveyContent = memo(
                       劳动项目
                     </TableCell>
                     <TableCell rowSpan={2} sx={{ ...columnBorderSx, ...tableMainHeaderSx }}>
-                      参与频率
+                      参与情况
                     </TableCell>
                     <TableCell rowSpan={2} sx={{ ...columnBorderSx, ...tableMainHeaderSx }}>
-                      能力表现
+                      技能掌握
                     </TableCell>
                     <TableCell rowSpan={2} sx={{ ...columnBorderSx, ...tableMainHeaderSx }}>
-                      品质标签（最多 3 项）
+                      品格养成（最多选 3 项）
                     </TableCell>
                   </TableRow>
                   <TableRow>
                     <TableCell sx={{ ...columnBorderSx, ...tableSubHeaderSx }}>
-                      大类
+                      大类别
                     </TableCell>
                     <TableCell sx={{ ...columnBorderSx, ...tableSubHeaderSx }}>
-                      小类
+                      细分类别
                     </TableCell>
                     <TableCell sx={{ ...columnBorderSx, ...tableSubHeaderSx }}>
-                      具体项目
+                      具体劳动项目
                     </TableCell>
                   </TableRow>
                 </TableHead>
@@ -472,12 +465,12 @@ const TeacherSurveyContent = memo(
         <Card>
           <CardContent>
             <Typography variant="h6" fontWeight={600} mb={2}>
-              综合问题
+              💡综合问题
             </Typography>
             <Stack spacing={3}>
               <Box>
                 <Typography fontWeight={600} mb={1}>
-                  1. 你在彩蝶劳动益美行计划中的参与频率？
+                  1、经过这次劳动计划，你参与劳动的总体频率是？
                 </Typography>
                 <Stack spacing={1}>
                   <Box display="flex" alignItems="center">
@@ -529,7 +522,7 @@ const TeacherSurveyContent = memo(
 
               <Box>
                 <Typography fontWeight={600} mb={1}>
-                  2. 通过计划，你形成良好劳动习惯的程度？
+                  2、经过这次劳动计划，你已经养成了积极参与劳动的习惯吗？
                 </Typography>
                 <Stack spacing={1}>
                   <Box display="flex" alignItems="center">
@@ -582,7 +575,7 @@ const TeacherSurveyContent = memo(
                   <Divider />
                   <Box>
                     <Typography fontWeight={600} mb={1}>
-                      3. 请为各阶段的劳动表现打分（0-100 分）
+                      3、请为你在这次劳动计划中表现出的品质打个分吧（0-100 分）！
                     </Typography>
                     {stages.length === 0 ? (
                       <Typography color="text.secondary">
@@ -671,9 +664,7 @@ const TeacherStudentPage = () => {
   const [config, setConfig] = useState<SurveyConfig | null>(null);
   const [answers, setAnswers] = useState<Record<number, SurveyItemAnswer>>({});
   const [composite, setComposite] = useState(EMPTY_COMPOSITE);
-  const [selectedTraits, setSelectedTraits] = useState<string[]>([]);
   const [lockStatus, setLockStatus] = useState(false);
-  const [renderedReview, setRenderedReview] = useState("");
   const [parentNote, setParentNote] = useState("暂无家长寄语~");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -730,8 +721,6 @@ const TeacherStudentPage = () => {
       setParentNote(
         data.parent_note?.content?.trim() || "暂无家长寄语~",
       );
-      setSelectedTraits(data.teacher_review?.selected_traits ?? []);
-      setRenderedReview(data.teacher_review?.rendered_text ?? "");
       setLockStatus(data.lock?.is_locked ?? false);
       setDirty(false);
     } catch (error) {
@@ -797,15 +786,11 @@ const TeacherStudentPage = () => {
 
   useEffect(() => {
     dirtyRef.current = dirty;
-    (window as any).__surveyDirtyGuard = dirty;
+    (window as any).__teacherDirtyGuard = dirty;
+    return () => {
+      (window as any).__teacherDirtyGuard = false;
+    };
   }, [dirty]);
-
-  useEffect(
-    () => () => {
-      (window as any).__surveyDirtyGuard = false;
-    },
-    [],
-  );
 
   const handleUpdateAnswer = useCallback(
     (itemId: number, partial: Partial<SurveyItemAnswer>) => {
@@ -886,21 +871,6 @@ const TeacherStudentPage = () => {
     [],
   );
 
-  const toggleReviewTrait = useCallback((trait: string) => {
-    setSelectedTraits((prev) => {
-      if (prev.includes(trait)) {
-        setDirty(true);
-        return prev.filter((item) => item !== trait);
-      }
-      if (prev.length >= 6) {
-        toastInfo("最多选择 6 个关键词哦~");
-        return prev;
-      }
-      setDirty(true);
-      return [...prev, trait];
-    });
-  }, []);
-
   const handleToggleLock = async (nextStatus: boolean) => {
     if (!studentId) return;
     setSavingLock(true);
@@ -922,12 +892,8 @@ const TeacherStudentPage = () => {
     }
   };
 
-  const handleSubmit = async () => {
+  const handleSaveChanges = async () => {
     if (!studentId) return;
-    if (selectedTraits.length === 0) {
-      toastInfo("请至少选择一个教师评价关键词哦~");
-      return;
-    }
     setSaving(true);
     try {
       const items = Object.entries(answers)
@@ -950,16 +916,9 @@ const TeacherStudentPage = () => {
         q3: composite.q3,
       };
 
-      const [
-        { data: savedSurvey },
-        { data: savedComposite },
-        { data: savedReview },
-      ] = await Promise.all([
+      const [{ data: savedSurvey }, { data: savedComposite }] = await Promise.all([
         client.put(`/teacher/students/${studentId}/survey`, { items }),
         client.put(`/teacher/students/${studentId}/composite`, compositePayload),
-        client.post(`/teacher/students/${studentId}/review`, {
-          selected_traits: selectedTraits,
-        }),
       ]);
 
       if (savedSurvey?.items) {
@@ -989,13 +948,12 @@ const TeacherStudentPage = () => {
         });
       }
 
-      if (savedReview) {
-        setSelectedTraits(savedReview.selected_traits ?? selectedTraits);
-        setRenderedReview(savedReview.rendered_text ?? "");
-      }
-
       setDirty(false);
-      toastSuccess("保存并提交成功！");
+      toastSuccess("修改已保存！");
+    } catch (error: any) {
+      const message =
+        error?.response?.data?.detail ?? "保存失败，请稍后重试~";
+      toastError(message);
     } finally {
       setSaving(false);
     }
@@ -1020,45 +978,12 @@ const TeacherStudentPage = () => {
   }
 
   const isFirstGrade = detail.student.grade === 1;
-  const previewText =
-    selectedTraits.length > 0
-      ? `亲爱的蝶宝：\n在劳动中，老师看到了你的${selectedTraits.join(
-          "、",
-        )}，希望你再接再厉，成长为坚毅担责、勤劳诚实、合作智慧的“小彩蝶”！`
-      : renderedReview || "请在上方选择关键词生成教师评价内容哦~";
-
   return (
     <Stack spacing={3}>
-      <Stack
-        direction={{ xs: "column", md: "row" }}
-        spacing={2}
-        justifyContent="space-between"
-        alignItems={{ xs: "flex-start", md: "center" }}
-      >
-        <Stack spacing={0.5}>
-          <Typography variant="h5" fontWeight={700}>
-            {detail.student.student_name}
-          </Typography>
-          <Typography color="text.secondary">
-            {detail.student.grade}年级 {detail.student.class_no}班 · 学号{" "}
-            {detail.student.student_no || "--"}
-          </Typography>
-        </Stack>
-        <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
-          <FormControlLabel
-            control={
-              <Switch
-                checked={lockStatus}
-                onChange={(event) => handleToggleLock(event.target.checked)}
-                disabled={savingLock}
-              />
-            }
-            label={lockStatus ? "已锁定" : "允许学生修改"}
-          />
-          <Button variant="outlined" onClick={handleBack}>
-            返回学生列表
-          </Button>
-        </Stack>
+      <Stack spacing={0.5}>
+        <Typography variant="h5" fontWeight={700}>
+          {detail.student.student_name}
+        </Typography>
       </Stack>
 
       <TeacherSurveyContent
@@ -1074,10 +999,25 @@ const TeacherStudentPage = () => {
         onCompositeScore={handleCompositeScore}
       />
 
+      <Stack
+        direction={{ xs: "column", sm: "row" }}
+        spacing={2}
+        justifyContent="flex-end"
+      >
+        <Button
+          variant="contained"
+          size="large"
+          onClick={handleSaveChanges}
+          disabled={saving || !dirty}
+        >
+          {saving ? "保存中..." : "保存修改"}
+        </Button>
+      </Stack>
+
       <Card>
         <CardContent>
           <Typography variant="h6" fontWeight={600} mb={2}>
-            家长寄语
+            👨‍👩‍👧‍👦家长寄语
           </Typography>
           <Typography sx={{ whiteSpace: "pre-wrap", lineHeight: 1.8 }}>
             {parentNote}
@@ -1085,77 +1025,27 @@ const TeacherStudentPage = () => {
         </CardContent>
       </Card>
 
-      <Card>
-        <CardContent>
-          <Typography variant="h6" fontWeight={600} mb={1.5}>
-            教师评价
-          </Typography>
-          <Typography color="text.secondary" mb={3}>
-            亲爱的蝶宝：在劳动中，老师看到了你的 ________ ，希望你再接再厉，成长为坚毅担责、勤劳诚实、合作智慧的“小彩蝶”！请选择 1-6 个关键词填入空格。
-          </Typography>
-          <Stack
-            direction="row"
-            spacing={2}
-            sx={{
-              flexWrap: "nowrap",
-              overflowX: "auto",
-              "& > *": { flex: "0 0 auto" },
-            }}
-          >
-            {traitsList.map((trait) => (
-              <FormControlLabel
-                key={trait}
-                control={
-                  <Checkbox
-                    checked={selectedTraits.includes(trait)}
-                    onChange={() => toggleReviewTrait(trait)}
-                  />
-                }
-                label={trait}
-              />
-            ))}
-          </Stack>
-
-          <Box
-            mt={3}
-            p={2}
-            sx={{
-              borderRadius: 2,
-              backgroundColor: "rgba(255, 138, 128, 0.08)",
-              border: "1px dashed",
-              borderColor: "primary.light",
-            }}
-          >
-            <Typography
-              variant="subtitle2"
-              color="primary"
-              fontWeight={600}
-              mb={1}
-            >
-              预览
-            </Typography>
-            <Typography sx={{ whiteSpace: "pre-wrap", lineHeight: 1.8 }}>
-              {previewText}
-            </Typography>
-          </Box>
-
-          <Stack
-            direction={{ xs: "column", md: "row" }}
-            spacing={2}
-            justifyContent="flex-end"
-            mt={4}
-          >
-            <Button
-              variant="contained"
-              size="large"
-              onClick={handleSubmit}
-              disabled={saving}
-            >
-              {saving ? "提交中..." : "保存并提交"}
-            </Button>
-          </Stack>
-        </CardContent>
-      </Card>
+      <Stack
+        direction={{ xs: "column", sm: "row" }}
+        spacing={2}
+        justifyContent="flex-end"
+      >
+        <Button
+          variant="contained"
+          color={lockStatus ? "secondary" : "primary"}
+          onClick={() => handleToggleLock(!lockStatus)}
+          disabled={savingLock}
+        >
+          {savingLock
+            ? "处理中..."
+            : lockStatus
+            ? "🔑解除锁定"
+            : "🔒锁定该学生信息"}
+        </Button>
+        <Button variant="outlined" onClick={handleBack}>
+          ↩️返回查看班级列表
+        </Button>
+      </Stack>
     </Stack>
   );
 };

@@ -55,12 +55,14 @@ const LoginPage = () => {
         sessionId: data.session_id,
         user: data.user,
       });
-      toastSuccess("登录成功，开始评测！");
       if (data.role === "student") {
+        toastSuccess("登录成功，开始评测！");
         navigate("/student/welcome", { replace: true });
       } else if (data.role === "admin") {
+        toastSuccess("登陆成功！");
         navigate("/admin", { replace: true });
       } else {
+        toastSuccess("登陆成功！");
         navigate("/teacher", { replace: true });
       }
     } finally {

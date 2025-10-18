@@ -102,7 +102,13 @@ async def get_my_survey(
     )
     result = await db.execute(stmt)
     response = result.scalar_one_or_none()
-    return _serialize_response(response, current_user)
+    data = _serialize_response(response, current_user)
+    lock_result = await db.execute(
+        select(StudentLock).where(StudentLock.student_id == current_user.id)
+    )
+    lock = lock_result.scalar_one_or_none()
+    data["is_locked"] = bool(lock and lock.is_locked)
+    return data
 
 
 @router.put("/survey", response_model=SurveyResponseOut, summary="保存我的问卷")
@@ -166,7 +172,9 @@ async def put_my_survey(
         },
     )
 
-    return _serialize_response(response, current_user)
+    result_data = _serialize_response(response, current_user)
+    result_data["is_locked"] = False
+    return result_data
 
 
 async def _fetch_items_map(

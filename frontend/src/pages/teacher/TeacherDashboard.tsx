@@ -1,662 +1,502 @@
-﻿import {
-  AppBar,
+import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
+import PendingActionsIcon from "@mui/icons-material/PendingActions";
+import {
   Box,
   Button,
-  Card,
-  CardContent,
   CircularProgress,
-  Container,
-  Divider,
-  FormControlLabel,
   Grid,
-  List,
-  ListItemButton,
-  ListItemText,
   Paper,
   Stack,
-  Switch,
-  Toolbar,
-  Typography,
-  Checkbox,
-  Radio,
-  RadioGroup,
   Table,
   TableBody,
   TableCell,
+  TableContainer,
   TableHead,
   TableRow,
+  Typography,
+  Checkbox,
+  FormControlLabel,
 } from "@mui/material";
-import EmojiNatureIcon from "@mui/icons-material/EmojiNature";
-import LogoutIcon from "@mui/icons-material/Logout";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 
 import client from "../../api/client";
-import { useAuthStore } from "../../store/auth";
 import { toastError, toastInfo, toastSuccess } from "../../components/toast";
+import { useAuthStore } from "../../store/auth";
 
-type StudentItem = {
+type TeacherStudentRow = {
   student_id: string;
+  student_no: string | null;
   student_name: string;
   class_no: string;
   grade: number;
   grade_band: string;
-  completion_status: boolean;
+  survey_completed: boolean;
+  parent_submitted: boolean;
+  teacher_submitted: boolean;
+  info_completed: boolean;
+  selected_traits: string[];
 };
 
-type SurveySection = {
-  major_category: string;
-  minor_category: string;
-  items: { id: number; prompt: string }[];
+type GradeBandKey = "low" | "mid" | "high";
+
+const TRAITS_BY_BAND: Record<GradeBandKey, string[]> = {
+  low: ["坚持", "主动", "勤快", "真诚", "互助", "乐学"],
+  mid: ["坚强", "负责", "勤俭", "诚恳", "协作", "探究"],
+  high: ["坚韧", "担当", "勤奋", "诚信", "团结", "创新"],
 };
 
-type SurveyConfig = {
-  traits: string[];
-  sections: SurveySection[];
-};
-
-type SurveyAnswer = {
-  frequency: string;
-  skill: string;
-  traits: string[];
-};
-
-type StudentDetail = {
-  student: {
-    id: string;
-    student_name: string;
-    class_no: string;
-    grade: number;
-    grade_band: string;
-  };
-  survey: {
-    items: {
-      survey_item_id: number;
-      frequency: string;
-      skill: string;
-      traits: string[];
-    }[];
-  } | null;
-  parent_note: {
-    content: string;
-    updated_at: string;
-  } | null;
-  composite: {
-    q1: Record<string, string>;
-    q2: Record<string, string>;
-    q3: Record<string, Record<string, number>>;
-  } | null;
-  teacher_review: {
-    selected_traits: string[];
-    rendered_text: string;
-  } | null;
-  lock: {
-    is_locked: boolean;
-  };
-};
-
-const frequencyOptions = ["每天", "经常", "偶尔"];
-const skillOptions = ["熟练", "一般", "不会"];
+const normalizeTraits = (traits: string[], options: string[]) =>
+  [...traits].sort((a, b) => options.indexOf(a) - options.indexOf(b));
 
 const TeacherDashboard = () => {
+  const navigate = useNavigate();
   const auth = useAuthStore();
-  const clearAuth = useAuthStore((state) => state.clear);
-  const [students, setStudents] = useState<StudentItem[]>([]);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [detail, setDetail] = useState<StudentDetail | null>(null);
-  const [config, setConfig] = useState<SurveyConfig | null>(null);
-  const [answers, setAnswers] = useState<Record<number, SurveyAnswer>>({});
-  const [originalAnswers, setOriginalAnswers] = useState<
-    Record<number, SurveyAnswer>
-  >({});
-  const [selectedTraits, setSelectedTraits] = useState<string[]>([]);
-  const [lockStatus, setLockStatus] = useState(false);
-  const [loadingDetail, setLoadingDetail] = useState(false);
-  const [savingSurvey, setSavingSurvey] = useState(false);
-  const [savingLock, setSavingLock] = useState(false);
-  const [savingReview, setSavingReview] = useState(false);
 
-  const dirtySurvey = useMemo(() => {
-    const keys = new Set([
-      ...Object.keys(originalAnswers),
-      ...Object.keys(answers),
-    ]);
-    for (const key of keys) {
-      const original = originalAnswers[Number(key)];
-      const current = answers[Number(key)];
-      if (!original && current) {
-        return true;
-      }
-      if (original && !current) {
-        return true;
-      }
-      if (
-        original &&
-        current &&
-        (original.frequency !== current.frequency ||
-          original.skill !== current.skill ||
-          original.traits.sort().join(",") !==
-            (current.traits ?? []).sort().join(","))
-      ) {
-        return true;
-      }
-    }
-    return false;
-  }, [answers, originalAnswers]);
-
-  const dirtyReview = useMemo(() => {
-    const original = detail?.teacher_review?.selected_traits ?? [];
-    return selectedTraits.sort().join(",") !== original.sort().join(",");
-  }, [detail?.teacher_review?.selected_traits, selectedTraits]);
-
-  const fetchStudents = useCallback(async () => {
-    const { data } = await client.get("/teacher/class/students");
-    setStudents(data);
-  }, []);
+  const [students, setStudents] = useState<TeacherStudentRow[]>([]);
+  const studentsRef = useRef<TeacherStudentRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [selections, setSelections] = useState<Record<string, string[]>>({});
+  const [dirtyMap, setDirtyMap] = useState<Record<string, boolean>>({});
+  const dirtyRef = useRef<Record<string, boolean>>({});
+  const [savingMap, setSavingMap] = useState<Record<string, boolean>>({});
+  const socketRef = useRef<WebSocket | null>(null);
 
   useEffect(() => {
-    fetchStudents();
-  }, [fetchStudents]);
-
-  const loadDetail = useCallback(async (studentId: string) => {
-    setLoadingDetail(true);
-    try {
-      const { data } = await client.get(`/teacher/students/${studentId}`);
-      setDetail(data);
-      setLockStatus(data.lock?.is_locked ?? false);
-      const gradeBand = data.student.grade_band ?? "low";
-      const conf = await client.get(`/config/survey?grade_band=${gradeBand}`);
-      setConfig(conf.data);
-      const mapped: Record<number, SurveyAnswer> = {};
-      data.survey?.items?.forEach((item: any) => {
-        mapped[item.survey_item_id] = {
-          frequency: item.frequency ?? "",
-          skill: item.skill ?? "",
-          traits: item.traits ?? [],
-        };
-      });
-      setAnswers(mapped);
-      setOriginalAnswers(mapped);
-      setSelectedTraits(data.teacher_review?.selected_traits ?? []);
-    } finally {
-      setLoadingDetail(false);
-    }
-  }, []);
+    studentsRef.current = students;
+  }, [students]);
 
   useEffect(() => {
-    if (!auth.user?.school_name || !auth.user?.class_no) {
+    dirtyRef.current = dirtyMap;
+  }, [dirtyMap]);
+
+  const hasDirty = useMemo(
+    () => Object.values(dirtyMap).some(Boolean),
+    [dirtyMap],
+  );
+
+  useEffect(() => {
+    const handler = (event: BeforeUnloadEvent) => {
+      if (!hasDirty) return;
+      event.preventDefault();
+      // eslint-disable-next-line no-param-reassign
+      event.returnValue = "";
+    };
+    if (hasDirty) {
+      window.addEventListener("beforeunload", handler);
+    }
+    return () => {
+      window.removeEventListener("beforeunload", handler);
+    };
+  }, [hasDirty]);
+
+  useEffect(() => {
+    (window as any).__teacherDirtyGuard = hasDirty;
+    return () => {
+      (window as any).__teacherDirtyGuard = false;
+    };
+  }, [hasDirty]);
+
+  const getTraitOptions = useCallback(
+    (band: string): string[] => {
+      if (band === "mid" || band === "high") {
+        return TRAITS_BY_BAND[band];
+      }
+      return TRAITS_BY_BAND.low;
+    },
+    [],
+  );
+
+  const loadStudents = useCallback(
+    async (options: { silent?: boolean } = {}) => {
+      const { silent = false } = options;
+      if (!silent) {
+        setLoading(true);
+      }
+      try {
+        const { data } = await client.get("/teacher/class/students");
+        setStudents(data);
+        setSelections((prev) => {
+          const next: Record<string, string[]> = {};
+          const currentDirty = dirtyRef.current;
+          data.forEach((row: TeacherStudentRow) => {
+            const optionsList = getTraitOptions(row.grade_band);
+            if (currentDirty[row.student_id]) {
+              const existing = prev[row.student_id] ?? row.selected_traits;
+              next[row.student_id] = normalizeTraits(existing, optionsList);
+            } else {
+              next[row.student_id] = normalizeTraits(
+                row.selected_traits,
+                optionsList,
+              );
+            }
+          });
+          return next;
+        });
+        setDirtyMap((prev) => {
+          const next: Record<string, boolean> = {};
+          data.forEach((row: TeacherStudentRow) => {
+            next[row.student_id] = prev[row.student_id] ?? false;
+          });
+          return next;
+        });
+        setSavingMap((prev) => {
+          const next: Record<string, boolean> = {};
+          data.forEach((row: TeacherStudentRow) => {
+            if (prev[row.student_id]) {
+              next[row.student_id] = prev[row.student_id];
+            }
+          });
+          return next;
+        });
+      } catch (error: any) {
+        const message =
+          error?.response?.data?.detail ?? "加载班级数据失败，请稍后重试。";
+        toastError(message);
+      } finally {
+        if (!silent) {
+          setLoading(false);
+        }
+      }
+    },
+    [getTraitOptions],
+  );
+
+  useEffect(() => {
+    loadStudents();
+  }, [loadStudents]);
+
+  useEffect(() => {
+    if (auth.user?.role === "admin") {
       return undefined;
     }
-    const classKey = `${auth.user.school_name}-${auth.user.class_no}`;
+    const school = auth.user?.school_name;
+    const classNo = auth.user?.class_no;
+    if (!school || !classNo) {
+      return undefined;
+    }
+    const classKey = `${school}-${classNo}`;
     const protocol = window.location.protocol === "https:" ? "wss" : "ws";
-    const socket = new WebSocket(
+    const ws = new WebSocket(
       `${protocol}://${window.location.host}/ws/teacher/${encodeURIComponent(classKey)}`,
     );
-    socket.onmessage = (event) => {
-      try {
-        const payload = JSON.parse(event.data);
-        fetchStudents();
-        if (payload.student_id && payload.student_id === selectedId) {
-          loadDetail(payload.student_id);
-        }
-      } catch (error) {
-        // ignore parsing failure
-      }
+    socketRef.current = ws;
+    ws.onmessage = () => {
+      loadStudents({ silent: true });
     };
-    return () => socket.close();
+    ws.onclose = () => {
+      socketRef.current = null;
+    };
+    return () => {
+      ws.close();
+      socketRef.current = null;
+    };
   }, [
+    auth.user?.role,
     auth.user?.school_name,
     auth.user?.class_no,
-    selectedId,
-    fetchStudents,
-    loadDetail,
+    loadStudents,
   ]);
 
-  const handleLogout = async () => {
-    try {
-      await client.post("/auth/logout");
-    } catch (error) {
-      // ignore
-    }
-    clearAuth();
-    window.location.href = "/login";
-  };
+  const arraysEqual = useCallback(
+    (a: string[], b: string[], options: string[]) => {
+      if (a.length !== b.length) return false;
+      const sortedA = normalizeTraits(a, options);
+      const sortedB = normalizeTraits(b, options);
+      return sortedA.every((value, index) => value === sortedB[index]);
+    },
+    [],
+  );
 
-  const handleSelectStudent = (studentId: string) => {
-    if (dirtySurvey || dirtyReview) {
-      const ok = window.confirm("是否保存更改？未保存的内容将丢失!");
-      if (!ok) {
+  const handleToggleTrait = useCallback(
+    (studentId: string, trait: string) => {
+      const student = studentsRef.current.find(
+        (item) => item.student_id === studentId,
+      );
+      if (!student) {
         return;
       }
-    }
-    setSelectedId(studentId);
-    loadDetail(studentId);
-  };
-
-  const updateAnswer = (itemId: number, partial: Partial<SurveyAnswer>) => {
-    setAnswers((prev) => {
-      const existing = prev[itemId] ?? { frequency: "", skill: "", traits: [] };
-      return {
-        ...prev,
-        [itemId]: {
-          ...existing,
-          ...partial,
-        },
-      };
-    });
-  };
-
-  const toggleTrait = (itemId: number, trait: string) => {
-    setAnswers((prev) => {
-      const existing = prev[itemId] ?? { frequency: "", skill: "", traits: [] };
-      let traits = existing.traits ?? [];
-      if (traits.includes(trait)) {
-        traits = traits.filter((t) => t !== trait);
-      } else {
-        if (traits.length >= 3) {
-          toastError("品格养成最多选择3项！");
-          return prev;
-        }
-        traits = [...traits, trait];
-      }
-      return {
-        ...prev,
-        [itemId]: { ...existing, traits },
-      };
-    });
-  };
-
-  const toggleReviewTrait = (trait: string) => {
-    setSelectedTraits((prev) =>
-      prev.includes(trait)
-        ? prev.filter((item) => item !== trait)
-        : [...prev, trait],
-    );
-  };
-
-  const saveSurvey = async () => {
-    if (!selectedId) return;
-    setSavingSurvey(true);
-    try {
-      const items = Object.entries(answers)
-        .filter(
-          ([_id, value]) =>
-            value.frequency ||
-            value.skill ||
-            (value.traits && value.traits.length > 0),
-        )
-        .map(([id, value]) => ({
-          survey_item_id: Number(id),
-          frequency: value.frequency || null,
-          skill: value.skill || null,
-          traits: value.traits,
+      const options = getTraitOptions(student.grade_band);
+      setSelections((prev) => {
+        const current = prev[studentId] ?? student.selected_traits ?? [];
+        const hasTrait = current.includes(trait);
+        const base = hasTrait
+          ? current.filter((item) => item !== trait)
+          : [...current, trait];
+        const next = normalizeTraits(base, options);
+        setDirtyMap((dirtyPrev) => ({
+          ...dirtyPrev,
+          [studentId]: !arraysEqual(next, student.selected_traits ?? [], options),
         }));
-      const { data } = await client.put(
-        `/teacher/students/${selectedId}/survey`,
-        { items },
-      );
-      toastSuccess("保存成功");
-      const updated: Record<number, SurveyAnswer> = {};
-      data.items.forEach((item: any) => {
-        updated[item.survey_item_id] = {
-          frequency: item.frequency ?? "",
-          skill: item.skill ?? "",
-          traits: item.traits ?? [],
+        return {
+          ...prev,
+          [studentId]: next,
         };
       });
-      setAnswers(updated);
-      setOriginalAnswers(updated);
-    } finally {
-      setSavingSurvey(false);
-    }
-  };
+    },
+    [arraysEqual, getTraitOptions],
+  );
 
-  const toggleLock = async (nextStatus: boolean) => {
-    if (!selectedId) return;
-    setSavingLock(true);
-    try {
-      await client.put(`/teacher/students/${selectedId}/lock`, {
-        is_locked: nextStatus,
-      });
-      setLockStatus(nextStatus);
-      toastInfo(nextStatus ? "已锁定当前信息" : "已解锁，学生可继续编辑");
-    } finally {
-      setSavingLock(false);
-    }
-  };
-
-  const saveReview = async () => {
-    if (!selectedId) return;
-    if (selectedTraits.length === 0) {
-      toastError("请至少选择一个关键词！");
-      return;
-    }
-    setSavingReview(true);
-    try {
-      const { data } = await client.post(
-        `/teacher/students/${selectedId}/review`,
-        {
-          selected_traits: selectedTraits,
-        },
+  const handleSave = useCallback(
+    async (studentId: string) => {
+      const student = studentsRef.current.find(
+        (item) => item.student_id === studentId,
       );
-      toastSuccess("教师评价已保存");
-      setSelectedTraits(data.selected_traits ?? selectedTraits);
-      setDetail((prev) =>
-        prev
-          ? {
-              ...prev,
-              teacher_review: data,
-            }
-          : prev,
-      );
-    } finally {
-      setSavingReview(false);
-    }
-  };
-
-  const handleReturnList = () => {
-    if (dirtySurvey || dirtyReview) {
-      const ok = window.confirm("是否保存更改？未保存的内容将丢失！");
-      if (!ok) {
+      if (!student) {
         return;
       }
-    }
-    setSelectedId(null);
-    setDetail(null);
-  };
+      const selection = selections[studentId] ?? [];
+      if (selection.length === 0) {
+        toastInfo("请至少选择一个关键词后再保存~");
+        return;
+      }
+      setSavingMap((prev) => ({ ...prev, [studentId]: true }));
+      try {
+        const { data } = await client.post(
+          `/teacher/students/${studentId}/review`,
+          { selected_traits: selection },
+        );
+        toastSuccess("教师评价已保存");
+        setStudents((prev) =>
+          prev.map((row) =>
+            row.student_id === studentId
+              ? {
+                  ...row,
+                  selected_traits: data.selected_traits ?? selection,
+                  teacher_submitted: true,
+                  info_completed:
+                    row.survey_completed &&
+                    row.parent_submitted &&
+                    (data.selected_traits ?? selection).length > 0,
+                }
+              : row,
+          ),
+        );
+        setSelections((prev) => ({
+          ...prev,
+          [studentId]: selection,
+        }));
+        setDirtyMap((prev) => ({ ...prev, [studentId]: false }));
+      } catch (error: any) {
+        const message =
+          error?.response?.data?.detail ?? "保存评价失败，请稍后重试。";
+        toastError(message);
+      } finally {
+        setSavingMap((prev) => ({ ...prev, [studentId]: false }));
+      }
+    },
+    [selections],
+  );
+
+  const handleNavigateToStudent = useCallback(
+    (studentId: string) => {
+      if (hasDirty) {
+        const confirmed = window.confirm(
+          "检测到仍有未保存的评价，是否放弃并继续？",
+        );
+        if (!confirmed) {
+          return;
+        }
+      }
+      navigate(`/teacher/students/${studentId}`);
+    },
+    [hasDirty, navigate],
+  );
+
+  if (loading) {
+    return (
+      <Stack alignItems="center" justifyContent="center" minHeight="40vh">
+        <CircularProgress color="primary" />
+        <Typography mt={2}>班级学生信息加载中，请稍候...</Typography>
+      </Stack>
+    );
+  }
+
+  if (students.length === 0) {
+    return (
+      <Paper elevation={2} sx={{ p: 6, textAlign: "center" }}>
+        <Typography variant="h6" mb={1}>
+          暂未找到班级学生
+        </Typography>
+        <Typography color="text.secondary">
+          请确认班级信息是否正确，或稍后再试。
+        </Typography>
+      </Paper>
+    );
+  }
 
   return (
-    <Box sx={{ backgroundColor: "#fef5ef", minHeight: "100vh" }}>
-      <AppBar position="static" color="transparent" elevation={0}>
-        <Toolbar sx={{ justifyContent: "space-between" }}>
-          <Stack direction="row" spacing={1} alignItems="center">
-            <EmojiNatureIcon color="primary" />
-            <Typography variant="h6" color="primary" fontWeight={700}>
-              班主任工作台
-            </Typography>
-          </Stack>
-          <Stack direction="row" spacing={2} alignItems="center">
-            <Typography color="text.secondary">
-              {auth.user?.teacher_name} ??
-            </Typography>
-            <Button
-              startIcon={<LogoutIcon />}
-              variant="outlined"
-              onClick={handleLogout}
-            >
-              退出系统{" "}
-            </Button>
-          </Stack>
-        </Toolbar>
-      </AppBar>
-      <Container maxWidth="xl" sx={{ py: 4 }}>
-        <Grid container spacing={3}>
-          <Grid item xs={12} md={3}>
-            <Paper elevation={3} sx={{ borderRadius: 3 }}>
-              <Box px={3} py={2}>
-                <Typography variant="h6" fontWeight={600}>
-                  班级学生
-                </Typography>
-              </Box>
-              <Divider />
-              <List>
-                {students.map((student) => (
-                  <ListItemButton
-                    key={student.student_id}
-                    selected={student.student_id === selectedId}
-                    onClick={() => handleSelectStudent(student.student_id)}
-                  >
-                    <ListItemText
-                      primary={`${student.student_name}`}
-                      secondary={
-                        student.completion_status
-                          ? "已完成信息收集✔"
-                          : "待完善..."
-                      }
-                    />
-                  </ListItemButton>
-                ))}
-              </List>
-            </Paper>
-          </Grid>
-          <Grid item xs={12} md={9}>
-            {selectedId ? (
-              loadingDetail ? (
-                <Stack
-                  alignItems="center"
-                  justifyContent="center"
-                  minHeight="40vh"
+    <Stack spacing={3} alignItems="center">
+      <Typography variant="h5" fontWeight={700} alignSelf="center">
+        班级学生列表
+      </Typography>
+      <TableContainer
+        component={Paper}
+        elevation={3}
+        sx={{ borderRadius: 3, maxWidth: 980, mx: "auto" }}
+      >
+        <Table sx={{ minWidth: 880 }} size="small">
+          <TableHead>
+            <TableRow>
+              <TableCell sx={{ fontWeight: 700, width: 100, textAlign: "center" }}>
+                学号
+              </TableCell>
+              <TableCell sx={{ fontWeight: 700, width: 160, textAlign: "center" }}>
+                姓名
+              </TableCell>
+              <TableCell sx={{ fontWeight: 700, width: 220, textAlign: "center" }}>
+                信息收集情况
+              </TableCell>
+              <TableCell
+                sx={{ fontWeight: 700, textAlign: "center", width: 320 }}
+              >
+                教师评价
+              </TableCell>
+              <TableCell sx={{ width: 150, textAlign: "center", pl: 2.5 }} />
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {students.map((row) => {
+              const options = getTraitOptions(row.grade_band);
+              const currentSelection = selections[row.student_id] ?? [];
+              const dirty = dirtyMap[row.student_id] ?? false;
+              const saving = savingMap[row.student_id] ?? false;
+              const statusText = row.info_completed
+                ? "已完成信息采集✔"
+                : "信息待完善…";
+              const saveDisabled =
+                saving || currentSelection.length === 0 || !dirty;
+
+              const firstRow = options.slice(0, 3);
+              const secondRow = options.slice(3, 6);
+
+              return (
+                <TableRow
+                  key={row.student_id}
+                  sx={{
+                    "&:nth-of-type(odd)": { backgroundColor: "rgba(255,248,240,0.6)" },
+                  }}
                 >
-                  <CircularProgress />
-                  <Typography mt={2}>学生信息加载中...</Typography>
-                </Stack>
-              ) : (
-                detail &&
-                config && (
-                  <Stack spacing={3}>
-                    <Stack
-                      direction={{ xs: "column", md: "row" }}
-                      justifyContent="space-between"
-                      alignItems={{ xs: "flex-start", md: "center" }}
-                      spacing={2}
+                  <TableCell sx={{ fontSize: "0.95rem", textAlign: "center" }}>
+                    {row.student_no || "--"}
+                  </TableCell>
+                  <TableCell sx={{ textAlign: "center", pl: 3 }}>
+                    <Button
+                      variant="text"
+                      color="primary"
+                      onClick={() => handleNavigateToStudent(row.student_id)}
+                      sx={{ fontWeight: 600 }}
                     >
-                      <Box>
-                        <Typography variant="h5" fontWeight={700}>
-                          {detail.student.student_name}
-                        </Typography>
-                        <Typography color="text.secondary">
-                          {detail.student.grade}年级{detail.student.class_no}
-                          班{" "}
-                        </Typography>
-                      </Box>
-                      <Stack direction="row" spacing={2}>
-                        <Button variant="outlined" onClick={handleReturnList}>
-                          返回查看班级列表
-                        </Button>
-                        <FormControlLabel
-                          control={
-                            <Switch
-                              checked={lockStatus}
-                              onChange={(event) =>
-                                toggleLock(event.target.checked)
-                              }
-                              disabled={savingLock}
-                            />
-                          }
-                          label={lockStatus ? "解锁" : "锁定当前信息"}
-                        />
-                      </Stack>
+                      {row.student_name}
+                    </Button>
+                  </TableCell>
+                  <TableCell sx={{ textAlign: "center", pl: 3 }}>
+                    <Stack
+                      direction="row"
+                      spacing={0.5}
+                      alignItems="center"
+                      justifyContent="center"
+                    >
+                      {row.info_completed ? (
+                        <CheckCircleOutlineIcon color="success" fontSize="small" />
+                      ) : (
+                        <PendingActionsIcon color="warning" fontSize="small" />
+                      )}
+                      <Typography
+                        color={row.info_completed ? "success.main" : "warning.main"}
+                        fontWeight={600}
+                      >
+                        {statusText}
+                      </Typography>
                     </Stack>
-
-                    <Card>
-                      <CardContent>
-                        <Typography variant="h6" fontWeight={600} mb={2}>
-                          学生自评表{" "}
-                        </Typography>
-                        <Table size="small">
-                          <TableHead>
-                            <TableRow>
-                              <TableCell width="22%">劳动项目</TableCell>
-                              <TableCell width="20%">参与情况</TableCell>
-                              <TableCell width="20%">技能掌握</TableCell>
-                              <TableCell>品格养成</TableCell>
-                            </TableRow>
-                          </TableHead>
-                          <TableBody>
-                            {config.sections.map((section) =>
-                              section.items.map((item) => {
-                                const value = answers[item.id] ?? {
-                                  frequency: "",
-                                  skill: "",
-                                  traits: [],
-                                };
-                                return (
-                                  <TableRow key={item.id}>
-                                    <TableCell>
-                                      <Typography fontWeight={600}>
-                                        {section.major_category}
-                                      </Typography>
-                                      <Typography color="text.secondary">
-                                        {section.minor_category}
-                                      </Typography>
-                                      <Typography mt={1}>
-                                        {item.prompt}
-                                      </Typography>
-                                    </TableCell>
-                                    <TableCell>
-                                      <RadioGroup
-                                        value={value.frequency}
-                                        onChange={(event) =>
-                                          updateAnswer(item.id, {
-                                            frequency: event.target.value,
-                                          })
-                                        }
-                                        row
-                                      >
-                                        {frequencyOptions.map((option) => (
-                                          <FormControlLabel
-                                            key={option}
-                                            value={option}
-                                            control={<Radio />}
-                                            label={option}
-                                          />
-                                        ))}
-                                      </RadioGroup>
-                                    </TableCell>
-                                    <TableCell>
-                                      <RadioGroup
-                                        value={value.skill}
-                                        onChange={(event) =>
-                                          updateAnswer(item.id, {
-                                            skill: event.target.value,
-                                          })
-                                        }
-                                        row
-                                      >
-                                        {skillOptions.map((option) => (
-                                          <FormControlLabel
-                                            key={option}
-                                            value={option}
-                                            control={<Radio />}
-                                            label={option}
-                                          />
-                                        ))}
-                                      </RadioGroup>
-                                    </TableCell>
-                                    <TableCell>
-                                      <Grid container spacing={1}>
-                                        {config.traits.map((trait) => (
-                                          <Grid item xs={4} key={trait}>
-                                            <FormControlLabel
-                                              control={
-                                                <Checkbox
-                                                  checked={value.traits.includes(
-                                                    trait,
-                                                  )}
-                                                  onChange={() =>
-                                                    toggleTrait(item.id, trait)
-                                                  }
-                                                />
-                                              }
-                                              label={trait}
-                                            />
-                                          </Grid>
-                                        ))}
-                                      </Grid>
-                                    </TableCell>
-                                  </TableRow>
-                                );
-                              }),
-                            )}
-                          </TableBody>
-                        </Table>
-                        <Stack
-                          direction={{ xs: "column", md: "row" }}
-                          spacing={2}
-                          mt={3}
-                        >
-                          <Button
-                            variant="contained"
-                            onClick={saveSurvey}
-                            disabled={!dirtySurvey || savingSurvey}
-                          >
-                            {savingSurvey ? "保存中..." : "确认保存修改"}
-                          </Button>
-                        </Stack>
-                      </CardContent>
-                    </Card>
-
-                    <Card>
-                      <CardContent>
-                        <Typography variant="h6" fontWeight={600} mb={2}>
-                          家长寄语
-                        </Typography>
-                        <Typography
-                          sx={{ whiteSpace: "pre-wrap", lineHeight: 1.8 }}
-                          color="text.secondary"
-                        >
-                          {detail.parent_note?.content ?? "暂无家长寄语­"}
-                        </Typography>
-                      </CardContent>
-                    </Card>
-
-                    <Card>
-                      <CardContent>
-                        <Typography variant="h6" fontWeight={600} mb={2}>
-                          教师评价模板
-                        </Typography>
-                        <Typography color="text.secondary" mb={2}>
-                          亲爱的蝶宝：在劳动中，老师看到了你的_______，希望你再接再厉，成长为坚毅担责、勤劳诚实、合作智慧的“小彩蝶”！
-                        </Typography>
-                        <Stack spacing={1}>
-                          {config.traits.map((trait) => (
+                    {!row.survey_completed && (
+                      <Typography variant="caption" color="text.secondary" display="block">
+                        自评问卷需完整填写
+                      </Typography>
+                    )}
+                    {!row.parent_submitted && (
+                      <Typography variant="caption" color="text.secondary" display="block">
+                        家长寄语尚未提交
+                      </Typography>
+                    )}
+                    {!row.teacher_submitted && (
+                      <Typography variant="caption" color="text.secondary" display="block">
+                        请完成教师评价后保存
+                      </Typography>
+                    )}
+                  </TableCell>
+                  <TableCell sx={{ textAlign: "center", pr: 3, width: 320 }}>
+                    <Stack spacing={1.5} alignItems="center" justifyContent="center">
+                      <Grid container spacing={0.5} justifyContent="center">
+                        {firstRow.map((trait) => (
+                          <Grid item xs="auto" key={trait}>
                             <FormControlLabel
-                              key={trait}
                               control={
                                 <Checkbox
-                                  checked={selectedTraits.includes(trait)}
-                                  onChange={() => toggleReviewTrait(trait)}
+                                  checked={currentSelection.includes(trait)}
+                                  onChange={() =>
+                                    handleToggleTrait(row.student_id, trait)
+                                  }
                                 />
                               }
                               label={trait}
                             />
-                          ))}
-                        </Stack>
-                        <Stack
-                          direction={{ xs: "column", md: "row" }}
-                          spacing={2}
-                          mt={3}
+                          </Grid>
+                        ))}
+                      </Grid>
+                      <Grid container spacing={0.5} justifyContent="center">
+                        {secondRow.map((trait) => (
+                          <Grid item xs="auto" key={trait}>
+                            <FormControlLabel
+                              control={
+                                <Checkbox
+                                  checked={currentSelection.includes(trait)}
+                                  onChange={() =>
+                                    handleToggleTrait(row.student_id, trait)
+                                  }
+                                />
+                              }
+                              label={trait}
+                            />
+                          </Grid>
+                        ))}
+                      </Grid>
+                    </Stack>
+                  </TableCell>
+                  <TableCell sx={{ textAlign: "center", pl: 0.5, pr: 7, width: 150 }}>
+
+                    <Stack spacing={0.5} alignItems="center">
+                      <Button
+                        variant="contained"
+                        sx={{
+                          minWidth: 110,
+                          borderRadius: 12,
+                          px: 1.75,
+                          mx: "auto",
+                        }}
+                        onClick={() => handleSave(row.student_id)}
+                        disabled={saveDisabled}
+                      >
+                        {saving ? "保存中..." : "保存评价"}
+                      </Button>
+                      {dirty && (
+                        <Typography
+                          variant="caption"
+                          color="primary"
+                          textAlign="center"
                         >
-                          <Button
-                            variant="contained"
-                            onClick={saveReview}
-                            disabled={!dirtyReview || savingReview}
-                          >
-                            {savingReview ? "保存中.." : "保存"}
-                          </Button>
-                          <Button variant="outlined" onClick={handleReturnList}>
-                            返回查看班级列表
-                          </Button>
-                        </Stack>
-                      </CardContent>
-                    </Card>
-                  </Stack>
-                )
-              )
-            ) : (
-              <Stack
-                alignItems="center"
-                justifyContent="center"
-                minHeight="50vh"
-              >
-                <Typography color="text.secondary">
-                  请选择一位学生查看详情{" "}
-                </Typography>
-              </Stack>
-            )}
-          </Grid>
-        </Grid>
-      </Container>
-    </Box>
+                          请保存~
+                        </Typography>
+                      )}
+                    </Stack>
+                  </TableCell>
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
+      </TableContainer>
+    </Stack>
   );
 };
 

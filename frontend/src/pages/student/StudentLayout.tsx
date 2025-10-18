@@ -17,8 +17,12 @@ const StudentLayout = ({ children }: Props) => {
   const { user, clear } = useAuthStore();
 
   useEffect(() => {
-    if (!user?.id) return undefined;
+    if (!user?.id) {
+      (window as any).__studentLockStatus = false;
+      return undefined;
+    }
     const protocol = window.location.protocol === "https:" ? "wss" : "ws";
+    (window as any).__studentLockStatus = false;
     const socket = new WebSocket(
       `${protocol}://${window.location.host}/ws/student/${user.id}`,
     );
@@ -26,6 +30,11 @@ const StudentLayout = ({ children }: Props) => {
       try {
         const payload = JSON.parse(event.data);
         if (payload.event === "lock_changed") {
+          const locked = Boolean(payload.is_locked);
+          (window as any).__studentLockStatus = locked;
+          window.dispatchEvent(
+            new CustomEvent("student-lock-changed", { detail: locked }),
+          );
           if (payload.is_locked) {
             toastError("表格数据已被锁定，无法更改~");
           } else {
@@ -38,7 +47,10 @@ const StudentLayout = ({ children }: Props) => {
         // ignore malformed message
       }
     };
-    return () => socket.close();
+    return () => {
+      socket.close();
+      (window as any).__studentLockStatus = false;
+    };
   }, [user?.id]);
 
   const handleLogout = async () => {
@@ -54,6 +66,7 @@ const StudentLayout = ({ children }: Props) => {
       // ignore
     }
     clear();
+    (window as any).__studentLockStatus = false;
     toastInfo("已退出系统，期待再次与你相遇~");
     navigate("/login", { replace: true });
   };

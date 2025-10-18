@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Path, status
-from sqlalchemy import delete, select, update
+from sqlalchemy import delete, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -63,34 +63,77 @@ async def list_students(
     stmt = (
         select(User)
         .where(User.role == UserRole.STUDENT)
-        .where(User.school_name == current_user.school_name)
-        .where(User.class_no == current_user.class_no)
-        .options(selectinload(User.completion_status))
-        .order_by(User.student_no)
-    )
-    if current_user.role == UserRole.ADMIN:
-        stmt = select(User).where(User.role == UserRole.STUDENT).options(
-            selectinload(User.completion_status)
+        .options(
+            selectinload(User.completion_status),
+            selectinload(User.teacher_review),
+            selectinload(User.survey_responses).selectinload(SurveyResponse.items),
         )
+    )
+    if current_user.role != UserRole.ADMIN:
+        stmt = stmt.where(User.school_name == current_user.school_name).where(
+            User.class_no == current_user.class_no
+        )
+        stmt = stmt.order_by(User.student_no)
+    else:
+        stmt = stmt.order_by(User.grade, User.class_no, User.student_no)
+
     result = await db.execute(stmt)
-    students = result.scalars().all()
+    students = result.scalars().unique().all()
+
+    counts_stmt = (
+        select(SurveyItem.grade_band, func.count(SurveyItem.id))
+        .group_by(SurveyItem.grade_band)
+        .order_by(SurveyItem.grade_band)
+    )
+    counts_result = await db.execute(counts_stmt)
+    expected_counts: dict[str, int] = {
+        (band.value if isinstance(band, GradeBand) else band): count
+        for band, count in counts_result
+    }
+
     items: list[StudentDashboardItem] = []
     for stu in students:
+        grade_band = stu.grade_band or GradeBand.LOW
+        expected_total = expected_counts.get(grade_band.value, 0)
+        survey_response = next(
+            (
+                resp
+                for resp in stu.survey_responses
+                if resp.responder_type == ResponderType.STUDENT
+            ),
+            None,
+        )
+        survey_items = list(survey_response.items) if survey_response else []
+        survey_completed = bool(
+            survey_response
+            and expected_total > 0
+            and len(survey_items) == expected_total
+            and all(
+                (item.frequency or "").strip() and (item.skill or "").strip()
+                for item in survey_items
+            )
+        )
+
         completion = stu.completion_status
+        parent_submitted = bool(completion and completion.parent_submitted)
+        teacher_submitted = bool(completion and completion.teacher_submitted)
+        info_completed = bool(survey_completed and parent_submitted and teacher_submitted)
+
         items.append(
             StudentDashboardItem(
                 student_id=stu.id,
+                student_no=stu.student_no,
                 student_name=stu.student_name or stu.username,
-                student_no=stu.student_no or "",
                 class_no=stu.class_no or "",
                 grade=stu.grade or 0,
-                grade_band=stu.grade_band.value if stu.grade_band else "",
-                completion_status=bool(
-                    completion
-                    and completion.student_submitted
-                    and completion.parent_submitted
-                    and completion.teacher_submitted
-                ),
+                grade_band=grade_band.value,
+                survey_completed=survey_completed,
+                parent_submitted=parent_submitted,
+                teacher_submitted=teacher_submitted,
+                info_completed=info_completed,
+                selected_traits=stu.teacher_review.selected_traits
+                if stu.teacher_review
+                else [],
             )
         )
     return items

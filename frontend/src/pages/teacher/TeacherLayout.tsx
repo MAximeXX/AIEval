@@ -1,18 +1,14 @@
 import LogoutIcon from "@mui/icons-material/Logout";
 import EmojiNatureIcon from "@mui/icons-material/EmojiNature";
 import { Box, Button, Container, Stack, Typography } from "@mui/material";
-import { useMemo, type ReactNode } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useMemo } from "react";
+import { Outlet, useLocation, useNavigate } from "react-router-dom";
 
 import client from "../../api/client";
 import { useAuthStore } from "../../store/auth";
 import { toastInfo } from "../../components/toast";
 
-type TeacherLayoutProps = {
-  children: ReactNode;
-};
-
-const TeacherLayout = ({ children }: TeacherLayoutProps) => {
+const TeacherLayout = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, clear } = useAuthStore();
@@ -29,7 +25,9 @@ const TeacherLayout = ({ children }: TeacherLayoutProps) => {
   }, [user]);
 
   const handleLogout = async () => {
-    if ((window as any).__surveyDirtyGuard) {
+    const hasUnsaved =
+      (window as any).__teacherDirtyGuard || (window as any).__surveyDirtyGuard;
+    if (hasUnsaved) {
       const ok = window.confirm("检测到问卷信息有修改，请先保存后再退出哦~");
       if (!ok) {
         return;
@@ -58,7 +56,7 @@ const TeacherLayout = ({ children }: TeacherLayoutProps) => {
             <Stack direction="row" spacing={1.5} alignItems="center">
               <EmojiNatureIcon color="primary" />
               <Typography variant="h6" color="primary" fontWeight={700}>
-                彩蝶劳动益美行
+                小彩蝶劳动益美行评测
               </Typography>
             </Stack>
             <Stack
@@ -78,7 +76,9 @@ const TeacherLayout = ({ children }: TeacherLayoutProps) => {
             </Stack>
           </Stack>
 
-          <Box>{children}</Box>
+          <Box>
+            <Outlet />
+          </Box>
         </Stack>
       </Container>
     </Box>

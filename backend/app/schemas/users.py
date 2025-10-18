@@ -21,8 +21,13 @@ class UserSummary(BaseModel):
 
 class StudentDashboardItem(BaseModel):
     student_id: UUID
+    student_no: Optional[str] = None
     student_name: str
     class_no: str
     grade: int
     grade_band: str
-    completion_status: bool
+    survey_completed: bool
+    parent_submitted: bool
+    teacher_submitted: bool
+    info_completed: bool
+    selected_traits: list[str]

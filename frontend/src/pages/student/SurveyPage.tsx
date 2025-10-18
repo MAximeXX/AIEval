@@ -93,6 +93,7 @@ type SurveyContentProps = {
   stages: string[];
   isFirstGrade: boolean;
   savingSurvey: boolean;
+  isLocked: boolean;
   onUpdateAnswer: (itemId: number, partial: Partial<SurveyItemAnswer>) => void;
   onToggleTrait: (itemId: number, trait: string) => void;
   onCompositeRadio: (
@@ -355,6 +356,7 @@ const SurveyContent = memo(
     stages,
     isFirstGrade,
     savingSurvey,
+    isLocked,
     onUpdateAnswer,
     onToggleTrait,
     onCompositeRadio,
@@ -638,7 +640,7 @@ const SurveyContent = memo(
             variant="contained"
             color="primary"
             onClick={onSaveSurvey}
-            disabled={savingSurvey}
+            disabled={savingSurvey || isLocked}
           >
             {savingSurvey ? "保存中..." : "保存问卷信息"}
           </Button>
@@ -668,12 +670,48 @@ const SurveyPage = () => {
   const [savingSurvey, setSavingSurvey] = useState(false);
   const [savingNote, setSavingNote] = useState(false);
   const [checkingAi, setCheckingAi] = useState(false);
-  const [loadError, setLoadError] = useState<string | null>(null);
+  const [isLocked, setIsLocked] = useState(false);
   const [dirtySurvey, setDirtySurvey] = useState(false);
   const [dirtyNote, setDirtyNote] = useState(false);
   const dirtyRef = useRef(false);
+  const lockedRef = useRef(false);
   const UNSAVED_PROMPT = "检测到问卷信息有修改，请注意保存！";
   const traitsList = config?.traits ?? [];
+
+  useEffect(() => {
+    lockedRef.current = isLocked;
+  }, [isLocked]);
+
+  const guardLocked = useCallback(() => {
+    if (!lockedRef.current) {
+      return false;
+    }
+    toastInfo("你无法修改了哦~");
+    return true;
+  }, []);
+
+  useEffect(() => {
+    const initial = (window as any).__studentLockStatus;
+    if (typeof initial === "boolean") {
+      setIsLocked(initial);
+    }
+  }, []);
+
+  useEffect(() => {
+    const listener = (event: Event) => {
+      const customEvent = event as CustomEvent<boolean>;
+      if (typeof customEvent.detail === "boolean") {
+        setIsLocked(customEvent.detail);
+      }
+    };
+    window.addEventListener("student-lock-changed", listener as EventListener);
+    return () => {
+      window.removeEventListener(
+        "student-lock-changed",
+        listener as EventListener,
+      );
+    };
+  }, []);
 
   useEffect(() => {
     let isMounted = true;
@@ -710,6 +748,9 @@ const SurveyPage = () => {
         } else {
           setAnswers({});
         }
+        const locked = Boolean(survey?.is_locked);
+        setIsLocked(locked);
+        (window as any).__studentLockStatus = locked;
 
         if (comp) {
           setComposite({
@@ -845,6 +886,9 @@ const SurveyPage = () => {
 
   const handleUpdateAnswer = useCallback(
     (itemId: number, partial: Partial<SurveyItemAnswer>) => {
+      if (guardLocked()) {
+        return;
+      }
       setAnswers((prev) => {
         const existing = prev[itemId] ?? {
           frequency: "",
@@ -861,10 +905,13 @@ const SurveyPage = () => {
       });
       setDirtySurvey(true);
     },
-    [],
+    [guardLocked],
   );
 
   const handleTraitToggle = useCallback((itemId: number, trait: string) => {
+    if (guardLocked()) {
+      return;
+    }
     setAnswers((prev) => {
       const existing = prev[itemId] ?? {
         frequency: "",
@@ -887,10 +934,13 @@ const SurveyPage = () => {
         [itemId]: { ...existing, traits },
       };
     });
-  }, []);
+  }, [guardLocked]);
 
   const handleCompositeRadio = useCallback(
     (questionKey: "q1" | "q2", rowKey: string, value: string) => {
+      if (guardLocked()) {
+        return;
+      }
       setComposite((prev) => ({
         ...prev,
         [questionKey]: {
@@ -900,11 +950,14 @@ const SurveyPage = () => {
       }));
       setDirtySurvey(true);
     },
-    [],
+    [guardLocked],
   );
 
   const handleCompositeScore = useCallback(
     (stage: string, metric: string, raw: string) => {
+      if (guardLocked()) {
+        return;
+      }
       const numeric = raw ? Number(raw) : NaN;
       if (raw && (Number.isNaN(numeric) || numeric < 0 || numeric > 100)) {
         toastError("请填写0-100 之间的数");
@@ -927,10 +980,13 @@ const SurveyPage = () => {
       });
       setDirtySurvey(true);
     },
-    [],
+    [guardLocked],
   );
 
   const saveSurvey = useCallback(async () => {
+    if (guardLocked()) {
+      return;
+    }
     setSavingSurvey(true);
     try {
       const payload = Object.entries(answers)
@@ -954,6 +1010,9 @@ const SurveyPage = () => {
         "/students/me/composite",
         composite,
       );
+      const locked = Boolean(savedSurvey?.is_locked);
+      setIsLocked(locked);
+      (window as any).__studentLockStatus = locked;
 
       if (savedSurvey?.items) {
         const syncedAnswers: Record<number, SurveyItemAnswer> = {};
@@ -985,9 +1044,12 @@ const SurveyPage = () => {
     } finally {
       setSavingSurvey(false);
     }
-  }, [answers, composite]);
+  }, [answers, composite, guardLocked]);
 
   const saveParentNote = useCallback(async () => {
+    if (guardLocked()) {
+      return;
+    }
     if (parentNote.length > 300) {
       toastError("家长寄语需300 字以内");
       return;
@@ -1000,7 +1062,7 @@ const SurveyPage = () => {
     } finally {
       setSavingNote(false);
     }
-  }, [parentNote]);
+  }, [guardLocked, parentNote]);
 
   const goReview = useCallback(async () => {
     if (dirtySurvey || dirtyNote) {
@@ -1090,6 +1152,7 @@ const SurveyPage = () => {
         stages={stages}
         isFirstGrade={isFirstGrade}
         savingSurvey={savingSurvey}
+        isLocked={isLocked}
         onUpdateAnswer={handleUpdateAnswer}
         onToggleTrait={handleTraitToggle}
         onCompositeRadio={handleCompositeRadio}
@@ -1110,17 +1173,25 @@ const SurveyPage = () => {
               placeholder="对您的孩子说些什么吧，但也不要太多哦~ 300字以内就行啦~"
               value={parentNote}
               onChange={(event) => {
+                if (guardLocked()) {
+                  return;
+                }
                 setParentNote(event.target.value);
                 setDirtyNote(true);
               }}
               helperText={`${parentNote.length}/300`}
             />
+            {isLocked && (
+              <Typography variant="caption" color="warning.main">
+                老师已锁定信息，暂时无法修改~
+              </Typography>
+            )}
             <Stack direction={{ xs: "column", md: "row" }} spacing={2}>
               <Button
                 variant="contained"
                 color="primary"
                 onClick={saveParentNote}
-                disabled={savingNote}
+                disabled={savingNote || isLocked}
               >
                 {savingNote ? "保存中..." : "保存家长寄语"}
               </Button>
