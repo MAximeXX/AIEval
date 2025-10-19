@@ -31,7 +31,7 @@ from app.schemas.survey import (
     SurveyResponseIn,
     SurveyResponseOut,
 )
-from app.services.completion import touch_completion
+from app.services.completion import is_student_submission_complete, touch_completion
 from app.services.llm import LlmService, build_llm_payload
 from app.services.realtime import manager
 
@@ -161,7 +161,8 @@ async def put_my_survey(
     response.updated_at = datetime.now(timezone.utc)
     await db.flush()
     await db.refresh(response, attribute_names=["items"])
-    await touch_completion(db, current_user.id, student_submitted=bool(response.items))
+    student_completed = await is_student_submission_complete(db, current_user)
+    await touch_completion(db, current_user.id, student_submitted=student_completed)
     await db.commit()
 
     await manager.broadcast_to_teacher(
@@ -219,7 +220,8 @@ async def put_composite(
         composite.payload = payload.model_dump()
         composite.updated_at = now
     await db.flush()
-    await touch_completion(db, current_user.id, student_submitted=True)
+    student_completed = await is_student_submission_complete(db, current_user)
+    await touch_completion(db, current_user.id, student_submitted=student_completed)
     await db.commit()
 
     await manager.broadcast_to_teacher(

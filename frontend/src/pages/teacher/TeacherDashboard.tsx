@@ -362,7 +362,7 @@ const TeacherDashboard = () => {
               const dirty = dirtyMap[row.student_id] ?? false;
               const saving = savingMap[row.student_id] ?? false;
               const statusText = row.info_completed
-                ? "已完成信息采集✔"
+                ? "已完成信息采集"
                 : "信息待完善…";
               const saveDisabled =
                 saving || currentSelection.length === 0 || !dirty;

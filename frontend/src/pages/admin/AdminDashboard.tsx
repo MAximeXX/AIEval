@@ -35,6 +35,21 @@ type ChartA = Record<
 
 type ChartLine = Record<string, Record<string, number>>;
 
+type GradeBandKey = "low" | "mid" | "high";
+
+const STAGE_POSITIONS: number[] = [15, 50, 85];
+
+const BAND_CONFIG: Record<
+  GradeBandKey,
+  { label: string; color: string }
+> = {
+  low: { label: "低年级", color: "#5B8FF9" },
+  mid: { label: "中年级", color: "#52C41A" },
+  high: { label: "高年级", color: "#FAAD14" },
+};
+
+const CHART_HEIGHT = 320;
+
 const AdminDashboard = () => {
   const clearAuth = useAuthStore((state) => state.clear);
   const [progress, setProgress] = useState<ProgressItem[]>([]);
@@ -73,9 +88,18 @@ const AdminDashboard = () => {
 
   const gradeOrder = [1, 2, 3, 4, 5, 6];
   const gradeColumns = gradeOrder.map((grade) => {
-    const label = `${grade}年级`;
+    const key = `${grade}年级`;
+    const labelMap: Record<number, string> = {
+      1: "一年级",
+      2: "二年级",
+      3: "三年级",
+      4: "四年级",
+      5: "五年级",
+      6: "六年级",
+    };
+    const label = labelMap[grade] ?? key;
     const items =
-      groupedProgress.find(([key]) => key === label)?.[1] ?? [];
+      groupedProgress.find(([progressKey]) => progressKey === key)?.[1] ?? [];
     return { grade, label, items };
   });
   const maxRows = Math.max(
@@ -94,52 +118,115 @@ const AdminDashboard = () => {
     window.location.href = "/login";
   };
 
-  const renderChartA = (metric: string, data: ChartA[string]) => {
-    const gradeNames = {
-      low: "低年级",
-      mid: "中年级",
-      high: "高年级",
-    } as Record<string, string>;
-    return {
-      tooltip: { trigger: "axis" },
-      legend: {
-        data: Object.keys(data.series).map((key) => gradeNames[key] ?? key),
+  const renderChartA = (_metric: string, data: ChartA[string]) => {
+    const buildSeriesData = (
+      band: GradeBandKey,
+      values: number[],
+    ): Array<{ value: [number, number] }> => {
+      const sanitized = values
+        .slice(0, STAGE_POSITIONS.length)
+        .map((item) => (Number.isFinite(item) ? Number(item) : 0));
+      if (band === "low") {
+        const third = Math.round(sanitized[2] ?? 0);
+        const second = Math.round(sanitized[1] ?? 0);
+        const first = Math.round(sanitized[0] ?? 0);
+        if (
+          third === 0 &&
+          (second !== 0 || sanitized.length <= 2)
+        ) {
+          return [
+            { value: [STAGE_POSITIONS[0], first] },
+            { value: [STAGE_POSITIONS[2], second] },
+          ];
+        }
+      }
+      return sanitized.map((item, index) => ({
+        value: [
+          STAGE_POSITIONS[
+            Math.min(index, STAGE_POSITIONS.length - 1)
+          ],
+          Math.round(item),
+        ],
+      }));
+    };
+
+    const series = (Object.keys(BAND_CONFIG) as GradeBandKey[]).map(
+      (bandKey) => {
+        const { label, color } = BAND_CONFIG[bandKey];
+        const rawValues = data?.series?.[bandKey] ?? [];
+        const points = buildSeriesData(bandKey, rawValues);
+        return {
+          name: label,
+          type: "line" as const,
+          symbol: "circle",
+          symbolSize: 8,
+          smooth: false,
+          connectNulls: true,
+          lineStyle: { color, width: 3 },
+          itemStyle: { color },
+          label: {
+            show: true,
+            position: "top",
+            color,
+            fontWeight: 600,
+            formatter: ({ value }: { value: [number, number] | number }) => {
+              if (Array.isArray(value)) {
+                return `${Math.round(value[1])}`;
+              }
+              return `${Math.round(value)}`;
+            },
+          },
+          data: points,
+          tooltip: { show: false },
+        };
       },
+    );
+
+    return {
+      tooltip: { show: false },
+      color: Object.values(BAND_CONFIG).map(({ color }) => color),
+      legend: {
+        data: Object.values(BAND_CONFIG).map(({ label }) => label),
+        bottom: 10,
+        icon: "circle",
+        itemWidth: 10,
+        itemHeight: 10,
+      },
+      grid: { left: 48, right: 24, top: 40, bottom: 50 },
       xAxis: {
-        type: "category",
-        data: data.stages,
-        name: "阶段",
-        boundaryGap: false,
+        type: "value",
+        min: 0,
+        max: 100,
+        axisLabel: { show: false },
+        axisTick: { show: false },
+        splitLine: { show: false },
+        axisLine: {
+          lineStyle: { color: "#94A3B8" },
+        },
       },
       yAxis: {
         type: "value",
         name: "平均分",
+        min: 0,
+        max: 100,
+        axisLine: {
+          lineStyle: { color: "#94A3B8" },
+        },
+        splitLine: {
+          lineStyle: { type: "dashed", color: "#E2E8F0" },
+        },
       },
-      series: Object.entries(data.series).map(([band, values]) => ({
-        name: gradeNames[band] ?? band,
-        type: "line",
-        smooth: true,
-        data: values,
-      })),
+      series,
     };
   };
 
-  const renderLineChart = (
-    title: string,
-    lineValues: Record<string, number>,
-  ) => {
+  const renderLineChart = (_: string, lineValues: Record<string, number>) => {
     const phases = ["原来", "现在"];
     const positions = [15, 85];
 
     return {
-      title: { text: title, left: "center", textStyle: { fontSize: 14 } },
-      tooltip: {
-        trigger: "item",
-        formatter: ({ value }: { value: [number, number] | number }) => {
-          const score = Array.isArray(value) ? value[1] : value;
-          return `平均分：${score}%`;
-        },
-      },
+      title: { show: false },
+      tooltip: { show: false },
       xAxis: {
         type: "value",
         min: 0,
@@ -148,8 +235,22 @@ const AdminDashboard = () => {
         axisLabel: { show: false },
         axisTick: { show: false },
         splitLine: { show: false },
+        axisLine: {
+          lineStyle: { color: "#94A3B8" },
+        },
       },
-      yAxis: { type: "value", name: "百分比（%）" },
+      yAxis: {
+        type: "value",
+        name: "百分比（%）",
+        min: 0,
+        max: 100,
+        axisLine: {
+          lineStyle: { color: "#94A3B8" },
+        },
+        splitLine: {
+          lineStyle: { type: "dashed", color: "#E2E8F0" },
+        },
+      },
       series: [
         {
           name: "全校",
@@ -172,12 +273,12 @@ const AdminDashboard = () => {
           ]),
         },
       ],
-      grid: { left: 50, right: 30, bottom: 70, top: 60 },
+      grid: { left: 50, right: 30, bottom: 45, top: 50 },
       graphic: [
         {
           type: "text",
           left: "21%",
-          bottom: 50,
+          bottom: 25,
           style: {
             text: "原来",
             fill: "#666",
@@ -187,7 +288,7 @@ const AdminDashboard = () => {
         {
           type: "text",
           left: "79%",
-          bottom: 50,
+          bottom: 25,
           style: {
             text: "现在",
             fill: "#666",
@@ -227,7 +328,7 @@ const AdminDashboard = () => {
           <Grid item xs={12}>
             <Paper elevation={3} sx={{ borderRadius: 3, p: 3 }}>
               <Typography variant="h6" fontWeight={600} mb={3}>
-                信息收集进度
+                📋信息收集进度
               </Typography>
               <Box display="grid" gridTemplateColumns="repeat(6, minmax(0, 1fr))" gap={2}>
                 {gradeColumns.map((column) => (
@@ -242,7 +343,13 @@ const AdminDashboard = () => {
                       flexDirection: "column",
                     }}
                   >
-                    <Typography align="center" fontWeight={700} color="primary" mb={1}>
+                    <Typography
+                      align="center"
+                      fontWeight={700}
+                      mb={1}
+                      variant="subtitle1"
+                      sx={{ fontSize: "1.1rem", color: "text.primary" }}
+                    >
                       {column.label}
                     </Typography>
                     <Stack spacing={1} sx={{ flex: 1 }}>
@@ -260,7 +367,15 @@ const AdminDashboard = () => {
                           }}
                         >
                           <Typography fontWeight={600}>{item.class_no}班</Typography>
-                          <Typography color="primary" fontWeight={700}>
+                          <Typography
+                            fontWeight={700}
+                            sx={{
+                              color:
+                                item.total > 0 && item.completed >= item.total
+                                  ? "success.main"
+                                  : "warning.main",
+                            }}
+                          >
                             {item.completed}/{item.total}
                           </Typography>
                         </Box>
@@ -281,10 +396,18 @@ const AdminDashboard = () => {
                 <Grid item xs={12} md={4} key={metric}>
                   <Card>
                     <CardContent>
-                      <Typography variant="h6" mb={2} fontWeight={600}>
+                      <Typography
+                        variant="subtitle1"
+                        fontWeight={600}
+                        mb={0.1}
+                        align="center"
+                      >
                         {metric}
                       </Typography>
-                      <ReactECharts option={renderChartA(metric, data)} />
+                      <ReactECharts
+                        option={renderChartA(metric, data)}
+                        style={{ height: CHART_HEIGHT }}
+                      />
                     </CardContent>
                   </Card>
                 </Grid>
@@ -297,15 +420,35 @@ const AdminDashboard = () => {
               <Grid item xs={12} md={4}>
                 <Card>
                   <CardContent>
-                    <ReactECharts option={renderLineChart("劳动参与率走势", overallB)} />
+                    <Typography
+                      variant="subtitle1"
+                      fontWeight={600}
+                      mb={0.1}
+                      align="center"
+                    >
+                      劳动参与率走势
+                    </Typography>
+                    <ReactECharts
+                      option={renderLineChart("劳动参与率走势", overallB)}
+                      style={{ height: CHART_HEIGHT }}
+                    />
                   </CardContent>
                 </Card>
               </Grid>
               <Grid item xs={12} md={4}>
                 <Card>
                   <CardContent>
+                    <Typography
+                      variant="subtitle1"
+                      fontWeight={600}
+                      mb={0.1}
+                      align="center"
+                    >
+                      劳动习惯养成率走势
+                    </Typography>
                     <ReactECharts
                       option={renderLineChart("劳动习惯养成率走势", overallC)}
+                      style={{ height: CHART_HEIGHT }}
                     />
                   </CardContent>
                 </Card>

@@ -34,7 +34,7 @@ from app.schemas.survey import (
     TeacherReviewOut,
 )
 from app.schemas.users import StudentDashboardItem
-from app.services.completion import touch_completion
+from app.services.completion import is_student_submission_complete, touch_completion
 from app.services.realtime import manager
 from app.services.teacher_review import get_grade_traits, render_review_text
 
@@ -334,7 +334,8 @@ async def teacher_override_survey(
         )
     response.updated_at = datetime.now(timezone.utc)
     await db.flush()
-    await touch_completion(db, student_id, student_submitted=bool(response.items))
+    student_completed = await is_student_submission_complete(db, student)
+    await touch_completion(db, student_id, student_submitted=student_completed)
     await db.commit()
 
     await manager.notify_student(
@@ -502,7 +503,8 @@ async def teacher_update_composite(
         composite.payload = payload_data
         composite.updated_at = now
     await db.flush()
-    await touch_completion(db, student_id, student_submitted=True)
+    student_completed = await is_student_submission_complete(db, student)
+    await touch_completion(db, student_id, student_submitted=student_completed)
     await db.commit()
 
     await manager.notify_student(
