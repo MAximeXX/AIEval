@@ -106,7 +106,7 @@ const surveyFrequencyOptions = ["每天", "经常", "偶尔"];
 const frequencyOptions = ["每天", "经常", "偶尔", "从不"];
 const skillOptions = ["熟练", "一般", "不会"];
 const habitOptions = ["完全同意", "比较同意", "部分同意", "不同意"];
-const metricLabels = ["劳动最棒", "动手真棒", "劳动形象佳"];
+const DEFAULT_METRIC_LABELS = ["坚毅担责", "勤劳诚实", "合作智慧"];
 
 type StructuredRow = {
   major: string;
@@ -353,6 +353,7 @@ type TeacherSurveyContentProps = {
   traitsList: string[];
   stages: string[];
   isFirstGrade: boolean;
+  metrics: string[];
   onUpdateAnswer: (itemId: number, partial: Partial<SurveyItemAnswer>) => void;
   onToggleTrait: (itemId: number, trait: string) => void;
   onCompositeRadio: (
@@ -371,6 +372,7 @@ const TeacherSurveyContent = memo(
     traitsList,
     stages,
     isFirstGrade,
+    metrics,
     onUpdateAnswer,
     onToggleTrait,
     onCompositeRadio,
@@ -575,7 +577,7 @@ const TeacherSurveyContent = memo(
                   <Divider />
                   <Box>
                     <Typography fontWeight={600} mb={1}>
-                      3、请为你在这次劳动计划中表现出的品质打个分吧（0-100 分）！
+                      3、请为你在这次劳动计划中表现出的品质打个分吧（0-100）！
                     </Typography>
                     {stages.length === 0 ? (
                       <Typography color="text.secondary">
@@ -586,7 +588,7 @@ const TeacherSurveyContent = memo(
                         <TableHead>
                           <TableRow>
                             <TableCell>阶段</TableCell>
-                            {metricLabels.map((metric) => (
+                            {metrics.map((metric) => (
                               <TableCell key={metric}>{metric}</TableCell>
                             ))}
                           </TableRow>
@@ -595,7 +597,7 @@ const TeacherSurveyContent = memo(
                           {stages.map((stage) => (
                             <TableRow key={stage}>
                               <TableCell>{stage}</TableCell>
-                              {metricLabels.map((metric) => (
+                              {metrics.map((metric) => (
                                 <TableCell key={metric}>
                                   <TextField
                                     type="number"
@@ -673,7 +675,7 @@ const TeacherStudentPage = () => {
 
   const dirtyRef = useRef(false);
 
-  const traitsList = config?.traits ?? [];
+const traitsList = config?.traits ?? [];
 
   const stages = useMemo(() => {
     const question = config?.composite_questions.find(
@@ -685,6 +687,14 @@ const TeacherStudentPage = () => {
     const gradeKey = detail?.student.grade?.toString() ?? "";
     return question.rows_by_grade[gradeKey] ?? [];
   }, [config?.composite_questions, detail?.student.grade]);
+
+  const metrics = useMemo(() => {
+    const question = config?.composite_questions.find(
+      (item) => item.key === "q3",
+    );
+    const cols = question?.columns ?? [];
+    return cols.length > 0 ? cols : DEFAULT_METRIC_LABELS;
+  }, [config?.composite_questions]);
 
   const syncDetail = useCallback(async () => {
     if (!studentId) {
@@ -993,6 +1003,7 @@ const TeacherStudentPage = () => {
         traitsList={traitsList}
         stages={stages}
         isFirstGrade={isFirstGrade}
+        metrics={metrics}
         onUpdateAnswer={handleUpdateAnswer}
         onToggleTrait={handleToggleTrait}
         onCompositeRadio={handleCompositeRadio}
