@@ -31,6 +31,9 @@ class Settings(BaseSettings):
     question_bank_path: Path = Field(
         default=Path(__file__).resolve().parents[1] / "data" / "questionnaire.json"
     )
+    qwen_api_base: str | None = Field(default=None)
+    qwen_api_key: str | None = Field(default=None)
+    qwen_model: str = Field(default="qwen-max")
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 
