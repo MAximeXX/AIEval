@@ -383,9 +383,14 @@ const TeacherDashboard = () => {
                   <TableCell sx={{ textAlign: "center", pl: 3 }}>
                     <Button
                       variant="text"
-                      color="primary"
+                      color="inherit"
                       onClick={() => handleNavigateToStudent(row.student_id)}
-                      sx={{ fontWeight: 600 }}
+                      sx={{
+                        textDecoration: "underline",
+                        fontWeight: 400,
+                        color: "text.primary",
+                        "&:hover": { textDecoration: "underline" },
+                      }}
                     >
                       {row.student_name}
                     </Button>
