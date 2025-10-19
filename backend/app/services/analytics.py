@@ -85,6 +85,10 @@ async def compute_charts(db: AsyncSession) -> dict:
 
     counters_b: Dict[str, Dict[str, int]] = defaultdict(lambda: defaultdict(int))
     counters_c: Dict[str, Dict[str, int]] = defaultdict(lambda: defaultdict(int))
+    total_b: Dict[str, float] = defaultdict(float)
+    total_c: Dict[str, float] = defaultdict(float)
+    total_counters_b: Dict[str, int] = defaultdict(int)
+    total_counters_c: Dict[str, int] = defaultdict(int)
     for composite, grade, grade_band in records:
         payload = composite.payload or {}
         band_key = (grade_band.value if grade_band else "low")
@@ -98,6 +102,8 @@ async def compute_charts(db: AsyncSession) -> dict:
                 counters_b[band_key][phase] += 1
                 chart_b.setdefault(band_key, {})
                 chart_b[band_key][phase] = chart_b[band_key].get(phase, 0.0) + SCORE_MAPPING[label]
+                total_b[phase] += SCORE_MAPPING[label]
+                total_counters_b[phase] += 1
 
         for phase in ("原来", "现在"):
             label = q2.get(phase)
@@ -105,6 +111,8 @@ async def compute_charts(db: AsyncSession) -> dict:
                 counters_c[band_key][phase] += 1
                 chart_c.setdefault(band_key, {})
                 chart_c[band_key][phase] = chart_c[band_key].get(phase, 0.0) + SCORE_MAPPING[label]
+                total_c[phase] += SCORE_MAPPING[label]
+                total_counters_c[phase] += 1
 
         for stage, metrics in q3.items():
             for metric_name in ("坚毅担责", "勤劳诚实", "合作智慧"):
@@ -163,8 +171,19 @@ async def compute_charts(db: AsyncSession) -> dict:
     chart_b_final = finalize_line(chart_b, counters_b)
     chart_c_final = finalize_line(chart_c, counters_c)
 
+    overall_b = {
+        phase: round(total_b[phase] / max(total_counters_b[phase], 1), 2)
+        for phase in ("原来", "现在")
+    }
+    overall_c = {
+        phase: round(total_c[phase] / max(total_counters_c[phase], 1), 2)
+        for phase in ("原来", "现在")
+    }
+
     return {
         "chart_a": formatted_a,
         "chart_b": chart_b_final,
         "chart_c": chart_c_final,
+        "overall_b": overall_b,
+        "overall_c": overall_c,
     }
