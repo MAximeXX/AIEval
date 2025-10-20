@@ -42,16 +42,21 @@ router = APIRouter(prefix="/teacher", tags=["教师端"])
 
 
 def _class_key(user: User) -> str:
-    return f"{user.school_name or ''}-{user.class_no or ''}"
+    grade_part = str(user.grade) if user.grade is not None else ""
+    return f"{user.school_name or ''}-{grade_part}-{user.class_no or ''}"
 
 
 async def _ensure_same_class(teacher: User, student: User) -> None:
     if teacher.role == UserRole.ADMIN:
         return
-    if (
-        teacher.school_name != student.school_name
-        or teacher.class_no != student.class_no
-    ):
+    same_school = teacher.school_name == student.school_name
+    same_class = (teacher.class_no or "") == (student.class_no or "")
+    grades_match = (
+        teacher.grade is None
+        or student.grade is None
+        or teacher.grade == student.grade
+    )
+    if not (same_school and same_class and grades_match):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="无权限访问该学生")
 
 
@@ -70,9 +75,10 @@ async def list_students(
         )
     )
     if current_user.role != UserRole.ADMIN:
-        stmt = stmt.where(User.school_name == current_user.school_name).where(
-            User.class_no == current_user.class_no
-        )
+        stmt = stmt.where(User.school_name == current_user.school_name)
+        if current_user.grade is not None:
+            stmt = stmt.where(User.grade == current_user.grade)
+        stmt = stmt.where(User.class_no == current_user.class_no)
         stmt = stmt.order_by(User.student_no)
     else:
         stmt = stmt.order_by(User.grade, User.class_no, User.student_no)

@@ -745,14 +745,16 @@ const traitsList = config?.traits ?? [];
   }, [syncDetail]);
 
   useEffect(() => {
-    const school = auth.user?.school_name;
-    const classNo = auth.user?.class_no;
-    if (!school || !classNo || !studentId) {
+    const school = auth.user?.school_name ?? "";
+    const classNo = auth.user?.class_no ?? "";
+    const gradeValue = auth.user?.grade;
+    const gradePart = gradeValue != null ? String(gradeValue) : "";
+    if (!school || !studentId) {
       return;
     }
     const protocol = window.location.protocol === "https:" ? "wss" : "ws";
     const socket = new WebSocket(
-      `${protocol}://${window.location.host}/ws/teacher/${encodeURIComponent(`${school}-${classNo}`)}`,
+      `${protocol}://${window.location.host}/ws/teacher/${encodeURIComponent(`${school}-${gradePart}-${classNo}`)}`,
     );
     socket.onmessage = (event) => {
       try {
@@ -765,7 +767,7 @@ const traitsList = config?.traits ?? [];
       }
     };
     return () => socket.close();
-  }, [auth.user?.school_name, auth.user?.class_no, studentId, syncDetail]);
+  }, [auth.user?.school_name, auth.user?.class_no, auth.user?.grade, studentId, syncDetail]);
 
   useEffect(() => {
     const handler = (event: BeforeUnloadEvent) => {

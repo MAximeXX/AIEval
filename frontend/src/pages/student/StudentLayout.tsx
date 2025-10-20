@@ -15,6 +15,8 @@ type Props = {
 const StudentLayout = ({ children }: Props) => {
   const navigate = useNavigate();
   const { user, clear } = useAuthStore();
+  const studentDisplayName =
+    (user?.student_name ?? user?.username ?? "").trim();
 
   useEffect(() => {
     if (!user?.id) {
@@ -93,7 +95,7 @@ const StudentLayout = ({ children }: Props) => {
               spacing={1.5}
             >
               <Typography color="text.secondary">
-                😊欢迎你，{user?.student_name ?? user?.username} 同学
+                😊欢迎你，{studentDisplayName}同学！
               </Typography>
               <Button
                 startIcon={<LogoutIcon />}

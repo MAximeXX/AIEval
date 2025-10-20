@@ -8,15 +8,13 @@ import theme from "./theme";
 import { ToastBridge, ToastProvider } from "./components/toast";
 
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
-  <React.StrictMode>
-    <ThemeProvider theme={theme}>
-      <CssBaseline />
-      <ToastProvider>
-        <BrowserRouter>
-          <App />
-          <ToastBridge />
-        </BrowserRouter>
-      </ToastProvider>
-    </ThemeProvider>
-  </React.StrictMode>,
+  <ThemeProvider theme={theme}>
+    <CssBaseline />
+    <ToastProvider>
+      <BrowserRouter>
+        <App />
+        <ToastBridge />
+      </BrowserRouter>
+    </ToastProvider>
+  </ThemeProvider>,
 );

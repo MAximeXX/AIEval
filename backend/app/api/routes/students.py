@@ -39,7 +39,8 @@ router = APIRouter(prefix="/students/me", tags=["学生端"])
 
 
 def _class_key(user: User) -> str:
-    return f"{user.school_name or ''}-{user.class_no or ''}"
+    grade_part = str(user.grade) if user.grade is not None else ""
+    return f"{user.school_name or ''}-{grade_part}-{user.class_no or ''}"
 
 
 def _serialize_response(

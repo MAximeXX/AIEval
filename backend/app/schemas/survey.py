@@ -66,7 +66,7 @@ class CompositeResponseOut(CompositeResponseIn):
 
 
 class ParentNoteIn(BaseModel):
-    content: str = Field(max_length=300, min_length=1)
+    content: str = Field(max_length=300, min_length=0)
 
 
 class ParentNoteOut(ParentNoteIn):

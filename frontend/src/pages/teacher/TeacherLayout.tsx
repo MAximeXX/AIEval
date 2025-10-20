@@ -13,15 +13,22 @@ const TeacherLayout = () => {
   const location = useLocation();
   const { user, clear } = useAuthStore();
 
-  const subtitle = useMemo(() => {
+  const greetingMessage = useMemo(() => {
     if (!user) {
       return "";
     }
+
+    const teacherName = (user.teacher_name ?? user.username ?? "").trim();
     if (user.role === "admin") {
-      return `管理员：${user.teacher_name ?? user.username ?? ""}`;
+      const adminLabel = teacherName ? `管理员${teacherName}` : "管理员";
+      return `😊欢迎您，${adminLabel}！`;
     }
-    const classLabel = user.class_no ? `${user.class_no}班` : "";
-    return `${user.teacher_name ?? user.username ?? ""} ${classLabel}`.trim();
+
+    const displayName = teacherName || user.username || "";
+    if (displayName) {
+      return `😊欢迎您，${displayName}老师！`;
+    }
+    return "😊欢迎您，老师！";
   }, [user]);
 
   const handleLogout = async () => {
@@ -64,7 +71,9 @@ const TeacherLayout = () => {
               spacing={1.5}
               alignItems={{ xs: "flex-start", sm: "center" }}
             >
-              <Typography color="text.secondary">{subtitle}</Typography>
+              <Typography color="text.secondary">
+                {greetingMessage}
+              </Typography>
               <Button
                 startIcon={<LogoutIcon />}
                 color="primary"

@@ -353,8 +353,27 @@ const AdminDashboard = () => {
                       {column.label}
                     </Typography>
                     <Stack spacing={1} sx={{ flex: 1 }}>
-                      {column.items.map((item) => (
-                        <Box
+                      {column.items.map((item) => {
+                        const raw = item.class_no?.trim() ?? "";
+                        let classNumber = raw;
+                        if (/^\d+$/.test(raw)) {
+                          classNumber = raw;
+                        } else if (item.grade) {
+                          const gradePrefix = String(item.grade);
+                          if (raw.startsWith(gradePrefix)) {
+                            const rest = raw.slice(gradePrefix.length);
+                            if (/^\d+$/.test(rest) && rest.length > 0) {
+                              classNumber = rest;
+                            }
+                          }
+                        }
+                        if (!classNumber) {
+                          classNumber = "-";
+                        }
+                        const classLabel =
+                          classNumber === "-" ? "—" : `${classNumber}班`;
+                        return (
+                          <Box
                           key={`${item.grade}-${item.class_no}`}
                           sx={{
                             borderRadius: 1,
@@ -365,8 +384,10 @@ const AdminDashboard = () => {
                             alignItems: "center",
                             backgroundColor: "rgba(14, 165, 233, 0.08)",
                           }}
-                        >
-                          <Typography fontWeight={600}>{item.class_no}班</Typography>
+                          >
+                          <Typography fontWeight={600}>
+                            {classLabel}
+                          </Typography>
                           <Typography
                             fontWeight={700}
                             sx={{
@@ -379,7 +400,8 @@ const AdminDashboard = () => {
                             {item.completed}/{item.total}
                           </Typography>
                         </Box>
-                      ))}
+                        );
+                      })}
                       {Array.from({ length: Math.max(0, maxRows - column.items.length) }).map((_, index) => (
                         <Box key={index} sx={{ minHeight: rowHeight - 16 }} />
                       ))}

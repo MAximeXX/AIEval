@@ -170,12 +170,14 @@ const TeacherDashboard = () => {
     if (auth.user?.role === "admin") {
       return undefined;
     }
-    const school = auth.user?.school_name;
-    const classNo = auth.user?.class_no;
-    if (!school || !classNo) {
+    const school = auth.user?.school_name ?? "";
+    const classNo = auth.user?.class_no ?? "";
+    const gradeValue = auth.user?.grade;
+    const gradePart = gradeValue != null ? String(gradeValue) : "";
+    if (!school) {
       return undefined;
     }
-    const classKey = `${school}-${classNo}`;
+    const classKey = `${school}-${gradePart}-${classNo}`;
     const protocol = window.location.protocol === "https:" ? "wss" : "ws";
     const ws = new WebSocket(
       `${protocol}://${window.location.host}/ws/teacher/${encodeURIComponent(classKey)}`,
@@ -195,6 +197,7 @@ const TeacherDashboard = () => {
     auth.user?.role,
     auth.user?.school_name,
     auth.user?.class_no,
+    auth.user?.grade,
     loadStudents,
   ]);
 
