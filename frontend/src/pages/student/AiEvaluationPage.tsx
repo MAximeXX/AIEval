@@ -16,6 +16,7 @@ const AiEvaluationPage = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [content, setContent] = useState<string | null>(null);
+  const [displayText, setDisplayText] = useState<string>("");
 
   useEffect(() => {
     const load = async () => {
@@ -34,11 +35,35 @@ const AiEvaluationPage = () => {
     load();
   }, []);
 
+  useEffect(() => {
+    if (content === null) {
+      setDisplayText("");
+      return;
+    }
+    const segments = Array.from(content);
+    if (segments.length === 0) {
+      setDisplayText("");
+      return;
+    }
+    setDisplayText(segments[0]);
+    let index = 1;
+    const timer = window.setInterval(() => {
+      if (index >= segments.length) {
+        window.clearInterval(timer);
+        return;
+      }
+      setDisplayText(segments.slice(0, index + 1).join(""));
+      index += 1;
+    }, 70);
+
+    return () => window.clearInterval(timer);
+  }, [content]);
+
   if (loading) {
     return (
       <Stack alignItems="center" justifyContent="center" minHeight="40vh">
         <CircularProgress color="secondary" />
-        <Typography mt={2}>彩小蝶正在评估中......</Typography>
+        <Typography mt={2}>🦋彩小蝶正在评估中......</Typography>
       </Stack>
     );
   }
@@ -48,19 +73,19 @@ const AiEvaluationPage = () => {
       <Card>
         <CardContent>
           <Typography variant="h6" fontWeight={600} mb={2}>
-            彩小蝶对你的综合评语
+            🦋彩小蝶对你的综合评语
           </Typography>
           <Typography sx={{ whiteSpace: "pre-wrap", lineHeight: 2 }}>
-            {content}
+            {displayText}
           </Typography>
         </CardContent>
       </Card>
       <Stack direction={{ xs: "column", md: "row" }} spacing={2}>
         <Button variant="contained" onClick={() => navigate("/student/survey")}>
-          返回问卷填写
+          ↩️返回问卷填写
         </Button>
         <Button variant="outlined" onClick={() => navigate("/student/review")}>
-          查看老师对你的评价
+          👩‍🏫查看老师对你的评价
         </Button>
       </Stack>
     </Stack>

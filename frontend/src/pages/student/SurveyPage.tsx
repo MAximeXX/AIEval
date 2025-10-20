@@ -1200,8 +1200,8 @@ const SurveyPage = () => {
               </Button>
               <Button variant="outlined" onClick={goAi} disabled={checkingAi}>
                 {checkingAi
-                  ? "\u68c0\u67e5\u4e2d..."
-                  : "\u67e5\u770b\u5f69\u5c0f\u8776\u5bf9\u4f60\u7684\u7efc\u5408\u8bc4\u8bed"}
+                  ? "检查中..."
+                  : "🦋查看彩小蝶对你的综合评语"}
               </Button>
             </Stack>
           </Stack>

@@ -54,7 +54,7 @@ const TeacherReviewPage = () => {
       if (index >= content.length) {
         clearInterval(timer);
       }
-    }, 50);
+    }, 70);
     return () => clearInterval(timer);
   }, [content]);
 
@@ -76,13 +76,13 @@ const TeacherReviewPage = () => {
           <Typography variant="h6" fontWeight={600} mb={2}>
             👩‍🏫老师对你的评价
           </Typography>
-          <Box sx={{ pl: 11 }}>
+          <Box sx={{ pl: 1 }}>
             <Typography
               sx={{
                 whiteSpace: "pre-wrap",
                 lineHeight: 2,
                 color: isPending ? "text.secondary" : "text.primary",
-                textIndent: (theme) => `-${theme.spacing(11)}`,
+                textIndent: (theme) => `-${theme.spacing(1)}`,
               }}
             >
               {displayText || content || ""}

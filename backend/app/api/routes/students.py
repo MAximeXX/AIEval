@@ -396,7 +396,11 @@ async def post_llm_eval(
     if not review:
         raise HTTPException(status_code=400, detail="老师还未对你做出评价哦，请耐心等待~")
 
-    payload = build_llm_payload(survey, parent_note, review)
+    composite = await _get_composite_response(db, current_user.id)
+    if not composite or not composite.payload:
+        raise HTTPException(status_code=400, detail="请先完善综合问题信息")
+
+    payload = build_llm_payload(survey, parent_note, review, composite)
     llm_service = LlmService()
     llm_eval = await llm_service.generate_once(
         db,
@@ -405,6 +409,7 @@ async def post_llm_eval(
         parent_note,
         review,
         payload,
+        force_refresh=False,
     )
     await touch_completion(db, current_user.id, llm_generated=True)
     await db.commit()
@@ -439,5 +444,17 @@ async def _get_parent_note(db: AsyncSession, student_id) -> ParentNote | None:
 async def _get_teacher_review(db: AsyncSession, student_id) -> TeacherReview | None:
     result = await db.execute(
         select(TeacherReview).where(TeacherReview.student_id == student_id)
+    )
+    return result.scalar_one_or_none()
+
+
+async def _get_composite_response(
+    db: AsyncSession, student_id
+) -> CompositeResponse | None:
+    result = await db.execute(
+        select(CompositeResponse).where(
+            CompositeResponse.student_id == student_id,
+            CompositeResponse.responder_type == ResponderType.STUDENT,
+        )
     )
     return result.scalar_one_or_none()
