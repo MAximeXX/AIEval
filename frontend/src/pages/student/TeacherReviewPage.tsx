@@ -62,7 +62,7 @@ const TeacherReviewPage = () => {
     return (
       <Stack alignItems="center" justifyContent="center" minHeight="40vh">
         <CircularProgress />
-        <Typography mt={2}>彩小蝶正在为你寻找老师的点评...</Typography>
+        <Typography mt={2}>正在为你寻找老师的点评...</Typography>
       </Stack>
     );
   }
@@ -99,7 +99,7 @@ const TeacherReviewPage = () => {
           onClick={() => navigate("/student/ai")}
           disabled={isPending}
         >
-          🦋查看彩小蝶对你的综合评语
+          🦋查看你的智能综评
         </Button>
       </Stack>
     </Stack>

@@ -107,6 +107,17 @@ const frequencyOptions = ["每天", "经常", "偶尔", "从不"];
 const skillOptions = ["熟练", "一般", "不会"];
 const habitOptions = ["完全同意", "比较同意", "部分同意", "不同意"];
 const DEFAULT_METRIC_LABELS = ["坚毅担责", "勤劳诚实", "合作智慧"];
+const compositeStageHints: Record<string, Record<string, string>> = {
+  "2": {
+    阶段1: "（2024.8-2025.8）",
+    阶段2: "（2025.8-现在）",
+  },
+  default: {
+    阶段1: "（2023.8-2024.8）",
+    阶段2: "（2024.8-2025.8）",
+    阶段3: "（2025.8-现在）",
+  },
+};
 
 type StructuredRow = {
   major: string;
@@ -352,6 +363,7 @@ type TeacherSurveyContentProps = {
   };
   traitsList: string[];
   stages: string[];
+  studentGrade: number | null;
   isFirstGrade: boolean;
   metrics: string[];
   onUpdateAnswer: (itemId: number, partial: Partial<SurveyItemAnswer>) => void;
@@ -371,6 +383,7 @@ const TeacherSurveyContent = memo(
     composite,
     traitsList,
     stages,
+    studentGrade,
     isFirstGrade,
     metrics,
     onUpdateAnswer,
@@ -587,16 +600,44 @@ const TeacherSurveyContent = memo(
                       <Table size="small">
                         <TableHead>
                           <TableRow>
-                            <TableCell>阶段</TableCell>
+                            <TableCell sx={{ fontSize: "1rem" }}>阶段</TableCell>
                             {metrics.map((metric) => (
-                              <TableCell key={metric}>{metric}</TableCell>
+                              <TableCell key={metric} sx={{ fontSize: "1rem", whiteSpace: "nowrap" }}>
+                                {metric}
+                              </TableCell>
                             ))}
                           </TableRow>
                         </TableHead>
                         <TableBody>
-                          {stages.map((stage) => (
-                            <TableRow key={stage}>
-                              <TableCell>{stage}</TableCell>
+                          {stages.map((stage) => {
+                            const gradeKey =
+                              typeof studentGrade === "number"
+                                ? String(studentGrade)
+                                : "default";
+                            const hintMap =
+                              compositeStageHints[gradeKey] ?? compositeStageHints.default;
+                            const hint = hintMap[stage] ?? '';
+                            return (
+                              <TableRow key={stage}>
+                                <TableCell
+                                  sx={{
+                                    whiteSpace: "nowrap",
+                                    width: { xs: 200, md: 260 },
+                                    pr: 1,
+                                    fontSize: "1rem",
+                                  }}
+                                >
+                                  {stage}
+                                  {hint ? (
+                                    <Typography
+                                      component="span"
+                                      color="text.secondary"
+                                      sx={{ ml: 1, fontSize: "1rem" }}
+                                    >
+                                      {hint}
+                                    </Typography>
+                                  ) : null}
+                                </TableCell>
                               {metrics.map((metric) => (
                                 <TableCell key={metric}>
                                   <TextField
@@ -632,7 +673,8 @@ const TeacherSurveyContent = memo(
                                 </TableCell>
                               ))}
                             </TableRow>
-                          ))}
+                          );
+                        })}
                         </TableBody>
                       </Table>
                     )}
@@ -667,7 +709,7 @@ const TeacherStudentPage = () => {
   const [answers, setAnswers] = useState<Record<number, SurveyItemAnswer>>({});
   const [composite, setComposite] = useState(EMPTY_COMPOSITE);
   const [lockStatus, setLockStatus] = useState(false);
-  const [parentNote, setParentNote] = useState("暂无家长寄语~");
+  const [parentNote, setParentNote] = useState("暂无家长评价~");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [savingLock, setSavingLock] = useState(false);
@@ -729,7 +771,7 @@ const traitsList = config?.traits ?? [];
       });
 
       setParentNote(
-        data.parent_note?.content?.trim() || "暂无家长寄语~",
+        data.parent_note?.content?.trim() || "暂无家长评价~",
       );
       setLockStatus(data.lock?.is_locked ?? false);
       setDirty(false);
@@ -904,7 +946,55 @@ const traitsList = config?.traits ?? [];
     }
   };
 
-  const handleSaveChanges = async () => {
+  const handleViewAi = useCallback(() => {
+    if (!studentId) {
+      return;
+    }
+    if (!detail?.survey || !config) {
+      toastInfo("请先完成问卷提交~");
+      return;
+    }
+    const expectedIds = new Set<number>();
+    config.sections.forEach((section) => {
+      section.items.forEach((item) => expectedIds.add(item.id));
+    });
+    const surveyItems = detail.survey.items ?? [];
+    const answeredIds = new Set<number>(surveyItems.map((item) => item.survey_item_id));
+    if (expectedIds.size === 0 || answeredIds.size !== expectedIds.size) {
+      toastInfo("请先完成问卷提交~");
+      return;
+    }
+    if (surveyItems.some((item) => !(item.frequency || "").trim() || !(item.skill || "").trim())) {
+      toastInfo("请完整填写问卷信息~");
+      return;
+    }
+    if (!detail.teacher_review) {
+      toastInfo("请先完成教师评价~");
+      return;
+    }
+    const q3 = (detail.composite as any)?.q3 ?? {};
+    if (!q3 || typeof q3 !== "object") {
+      toastInfo("请先完善综合问题信息~");
+      return;
+    }
+    const hasIncompleteStage = stages.some((stage) => {
+      const stageData = q3[stage];
+      if (!stageData || typeof stageData !== "object") {
+        return true;
+      }
+      return metrics.some((metric) => {
+        const value = stageData[metric];
+        return value === undefined || value === null || value === "";
+      });
+    });
+    if (hasIncompleteStage) {
+      toastInfo("请先完善综合问题信息~");
+      return;
+    }
+    navigate(`/teacher/students/${studentId}/ai`);
+  }, [studentId, detail, config, stages, metrics, navigate, toastInfo]);
+
+const handleSaveChanges = async () => {
     if (!studentId) return;
     setSaving(true);
     try {
@@ -1004,6 +1094,7 @@ const traitsList = config?.traits ?? [];
         composite={composite}
         traitsList={traitsList}
         stages={stages}
+        studentGrade={detail.student.grade ?? null}
         isFirstGrade={isFirstGrade}
         metrics={metrics}
         onUpdateAnswer={handleUpdateAnswer}
@@ -1015,7 +1106,7 @@ const traitsList = config?.traits ?? [];
       <Stack
         direction={{ xs: "column", sm: "row" }}
         spacing={2}
-        justifyContent="flex-end"
+        justifyContent="flex-start"
       >
         <Button
           variant="contained"
@@ -1030,7 +1121,7 @@ const traitsList = config?.traits ?? [];
       <Card>
         <CardContent>
           <Typography variant="h6" fontWeight={600} mb={2}>
-            👨‍👩‍👧‍👦家长寄语
+            👨‍👩‍👧‍👦家长评价（请围绕孩子的劳动表现展开）
           </Typography>
           <Typography sx={{ whiteSpace: "pre-wrap", lineHeight: 1.8 }}>
             {parentNote}
@@ -1041,8 +1132,14 @@ const traitsList = config?.traits ?? [];
       <Stack
         direction={{ xs: "column", sm: "row" }}
         spacing={2}
-        justifyContent="flex-end"
+        justifyContent="flex-start"
       >
+        <Button
+          variant="outlined"
+          onClick={handleViewAi}
+        >
+          🦋查看小彩蝶的智能综评
+        </Button>
         <Button
           variant="contained"
           color={lockStatus ? "secondary" : "primary"}

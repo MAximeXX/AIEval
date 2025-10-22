@@ -51,7 +51,7 @@ const TeacherLayout = () => {
   };
 
   return (
-    <Box sx={{ minHeight: "100vh", backgroundColor: "#fff7f0" }}>
+    <Box sx={{ minHeight: "100vh", backgroundColor: "#f0f9ff" }}>
       <Container maxWidth="lg" sx={{ py: 4 }}>
         <Stack spacing={4}>
           <Stack
@@ -63,7 +63,7 @@ const TeacherLayout = () => {
             <Stack direction="row" spacing={1.5} alignItems="center">
               <EmojiNatureIcon color="primary" />
               <Typography variant="h6" color="primary" fontWeight={700}>
-                小彩蝶劳动益美行评测
+                南湖“小彩蝶”劳动益“美”行——蝶宝劳动成长评价
               </Typography>
             </Stack>
             <Stack

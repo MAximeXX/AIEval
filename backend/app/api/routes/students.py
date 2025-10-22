@@ -390,9 +390,6 @@ async def post_llm_eval(
         raise HTTPException(status_code=400, detail="请完整填写全部问卷题目后再生成评价")
 
     parent_note = await _get_parent_note(db, current_user.id)
-    if not parent_note:
-        raise HTTPException(status_code=400, detail="请先提交家长寄语")
-
     review = await _get_teacher_review(db, current_user.id)
     if not review:
         raise HTTPException(status_code=400, detail="老师还未对你做出评价哦，请耐心等待~")

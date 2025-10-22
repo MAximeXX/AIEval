@@ -424,7 +424,7 @@ const AdminDashboard = () => {
                         mb={0.1}
                         align="center"
                       >
-                        {metric}
+                        🦋{metric}
                       </Typography>
                       <ReactECharts
                         option={renderChartA(metric, data)}

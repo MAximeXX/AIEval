@@ -80,6 +80,22 @@ const surveyFrequencyOptions = ["每天", "经常", "偶尔"];
 const frequencyOptions = ["每天", "经常", "偶尔", "从不"];
 const skillOptions = ["熟练", "一般", "不会"];
 const habitOptions = ["完全同意", "比较同意", "部分同意", "不同意"];
+const compositeMetrics = ["坚毅担责", "勤劳诚实", "合作智慧"];
+const compositeStageHints: Record<
+  string,
+  Record<string, string>
+> = {
+  "2": {
+    阶段1: "（2024.8-2025.8）",
+    阶段2: "（2025.8-现在）",
+  },
+  default: {
+    阶段1: "（2023.8-2024.8）",
+    阶段2: "（2024.8-2025.8）",
+    阶段3: "（2025.8-现在）",
+  },
+};
+const ENABLE_SURVEY_AUTOFILL = import.meta.env.VITE_ENABLE_SURVEY_AUTOFILL === "true";
 
 type SurveyContentProps = {
   config: SurveyConfig;
@@ -91,6 +107,7 @@ type SurveyContentProps = {
   };
   traitsList: string[];
   stages: string[];
+  grade: number;
   isFirstGrade: boolean;
   savingSurvey: boolean;
   isLocked: boolean;
@@ -354,6 +371,7 @@ const SurveyContent = memo(
     composite,
     traitsList,
     stages,
+    grade,
     isFirstGrade,
     savingSurvey,
     isLocked,
@@ -582,22 +600,45 @@ const SurveyContent = memo(
                   <Divider />
                   <Box>
                     <Typography fontWeight={600} mb={1}>
-                      3、请为你在这次劳动计划中表现出的品质打个分吧（0-100）！
+                      3、请为你在这次劳动计划中表现出的品格打个分吧（0-100）！
                     </Typography>
                     <Table size="small">
                       <TableHead>
                         <TableRow>
-                          <TableCell>阶段</TableCell>
-                          <TableCell>坚毅担责</TableCell>
-                          <TableCell>勤劳诚实</TableCell>
-                          <TableCell>合作智慧</TableCell>
+                          <TableCell sx={{ fontSize: "1rem" }}>阶段</TableCell>
+                          <TableCell sx={{ fontSize: "1rem" }}>坚毅担责</TableCell>
+                          <TableCell sx={{ fontSize: "1rem" }}>勤劳诚实</TableCell>
+                          <TableCell sx={{ fontSize: "1rem" }}>合作智慧</TableCell>
                         </TableRow>
                       </TableHead>
                       <TableBody>
-                        {stages.map((stage) => (
-                          <TableRow key={stage}>
-                            <TableCell>{stage}</TableCell>
-                            {["坚毅担责", "勤劳诚实", "合作智慧"].map((metric) => (
+                        {stages.map((stage) => {
+                          const hintMap =
+                            compositeStageHints[String(grade)] ??
+                            compositeStageHints.default;
+                          const hint = hintMap[stage] ?? "";
+                          return (
+                            <TableRow key={stage}>
+                              <TableCell
+                                sx={{
+                                  whiteSpace: "nowrap",
+                                  width: { xs: 200, md: 260 },
+                                  pr: 1,
+                                  fontSize: "1rem",
+                                }}
+                              >
+                                {stage}
+                                {hint ? (
+                                  <Typography
+                                    component="span"
+                                    color="text.secondary"
+                                    sx={{ ml: 1, fontSize: "0.85rem" }}
+                                  >
+                                    {hint}
+                                  </Typography>
+                                ) : null}
+                              </TableCell>
+                              {["坚毅担责", "勤劳诚实", "合作智慧"].map((metric) => (
                               <TableCell key={metric}>
                                 <TextField
                                   type="number"
@@ -625,7 +666,8 @@ const SurveyContent = memo(
                               </TableCell>
                             ))}
                           </TableRow>
-                        ))}
+                        );
+                      })}
                       </TableBody>
                     </Table>
                   </Box>
@@ -635,7 +677,11 @@ const SurveyContent = memo(
           </CardContent>
         </Card>
 
-        <Stack direction={{ xs: "column", md: "row" }} spacing={2}>
+        <Stack
+          direction={{ xs: "column", md: "row" }}
+          spacing={2}
+          alignItems={{ xs: "flex-start", md: "center" }}
+        >
           <Button
             variant="contained"
             color="primary"
@@ -644,6 +690,11 @@ const SurveyContent = memo(
           >
             {savingSurvey ? "保存中..." : "保存问卷信息"}
           </Button>
+          {isLocked && (
+            <Typography color="red" variant="body2">
+              老师已锁定信息，暂时无法修改~
+            </Typography>
+          )}
         </Stack>
       </>
     );
@@ -983,6 +1034,79 @@ const SurveyPage = () => {
     [guardLocked],
   );
 
+  const handleAutofill = useCallback(() => {
+    if (!ENABLE_SURVEY_AUTOFILL) {
+      return;
+    }
+    if (guardLocked()) {
+      return;
+    }
+    if (!config) {
+      toastError("问卷配置尚未加载完成，请稍后再试~");
+      return;
+    }
+    const randomInt = (min: number, max: number) =>
+      Math.floor(Math.random() * (max - min + 1)) + min;
+    const pickRandom = <T,>(options: T[]): T =>
+      options[randomInt(0, options.length - 1)];
+    const pickTraits = (list: string[]): string[] => {
+      if (list.length === 0) {
+        return [];
+      }
+      const limit = Math.min(3, list.length);
+      const count = randomInt(1, limit);
+      const shuffled = [...list];
+      for (let i = shuffled.length - 1; i > 0; i -= 1) {
+        const j = randomInt(0, i);
+        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+      }
+      return shuffled.slice(0, count);
+    };
+
+    const generatedAnswers: Record<number, SurveyItemAnswer> = {};
+    config.sections.forEach((section) => {
+      section.items.forEach((item) => {
+        generatedAnswers[item.id] = {
+          frequency: pickRandom(surveyFrequencyOptions),
+          skill: pickRandom(skillOptions),
+          traits: pickTraits(traitsList),
+        };
+      });
+    });
+
+    const generatedComposite = {
+      q1: {
+        原来: pickRandom(frequencyOptions),
+        现在: pickRandom(frequencyOptions),
+      },
+      q2: {
+        原来: pickRandom(habitOptions),
+        现在: pickRandom(habitOptions),
+      },
+      q3:
+        stages.length === 0
+          ? {}
+          : stages.reduce<Record<string, Record<string, number>>>(
+              (acc, stage) => {
+                acc[stage] = compositeMetrics.reduce(
+                  (metricAcc, metric) => ({
+                    ...metricAcc,
+                    [metric]: randomInt(0, 100),
+                  }),
+                  {} as Record<string, number>,
+                );
+                return acc;
+              },
+              {},
+            ),
+    };
+
+    setAnswers(generatedAnswers);
+    setComposite(generatedComposite);
+    setDirtySurvey(true);
+    toastInfo("已随机填写问卷，请确认后保存~");
+  }, [config, guardLocked, stages, traitsList]);
+
   const saveSurvey = useCallback(async () => {
     if (guardLocked()) {
       return;
@@ -1103,16 +1227,6 @@ const SurveyPage = () => {
         return;
       }
 
-      const { data: noteData } = await client.get("/students/me/parent-note");
-
-      const parentContent = (noteData?.content ?? "").trim();
-
-      if (!parentContent) {
-        toastInfo("请先填写家长寄语~");
-
-        return;
-      }
-
       try {
         await client.get("/students/me/teacher-review");
       } catch (error: any) {
@@ -1127,7 +1241,7 @@ const SurveyPage = () => {
 
       navigate("/student/ai");
     } catch (error) {
-      toastError("暂时无法查看彩小蝶的综合评语, 请稍后再试~");
+      toastError("暂时无法智能综评, 请稍后再试~");
     } finally {
       setCheckingAi(false);
     }
@@ -1144,12 +1258,25 @@ const SurveyPage = () => {
 
   return (
     <Stack spacing={4}>
+      {ENABLE_SURVEY_AUTOFILL && (
+        <Box>
+          <Button
+            variant="outlined"
+            size="small"
+            onClick={handleAutofill}
+            disabled={isLocked}
+          >
+            一键填写（测试专用）
+          </Button>
+        </Box>
+      )}
       <SurveyContent
         config={config}
         answers={answers}
         composite={composite}
         traitsList={traitsList}
         stages={stages}
+        grade={grade}
         isFirstGrade={isFirstGrade}
         savingSurvey={savingSurvey}
         isLocked={isLocked}
@@ -1163,7 +1290,7 @@ const SurveyPage = () => {
       <Card>
         <CardContent>
           <Typography variant="h6" fontWeight={600} mb={2}>
-            👨‍👩‍👧‍👦家长寄语
+            👨‍👩‍👧‍👦家长评价（请围绕孩子的劳动表现展开）
           </Typography>
           <Stack spacing={2}>
             <TextField
@@ -1181,11 +1308,6 @@ const SurveyPage = () => {
               }}
               helperText={`${parentNote.length}/300`}
             />
-            {isLocked && (
-              <Typography variant="caption" color="warning.main">
-                老师已锁定信息，暂时无法修改~
-              </Typography>
-            )}
             <Stack direction={{ xs: "column", md: "row" }} spacing={2}>
               <Button
                 variant="contained"
@@ -1193,7 +1315,7 @@ const SurveyPage = () => {
                 onClick={saveParentNote}
                 disabled={savingNote || isLocked}
               >
-                {savingNote ? "保存中..." : "保存家长寄语"}
+                {savingNote ? "保存中..." : "保存家长评价"}
               </Button>
               <Button variant="outlined" onClick={goReview}>
                 👩‍🏫查看老师对你的评价
@@ -1201,7 +1323,7 @@ const SurveyPage = () => {
               <Button variant="outlined" onClick={goAi} disabled={checkingAi}>
                 {checkingAi
                   ? "检查中..."
-                  : "🦋查看彩小蝶对你的综合评语"}
+                  : "🦋查看你的智能综评"}
               </Button>
             </Stack>
           </Stack>

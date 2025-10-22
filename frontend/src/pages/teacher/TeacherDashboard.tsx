@@ -269,7 +269,6 @@ const TeacherDashboard = () => {
                   teacher_submitted: true,
                   info_completed:
                     row.survey_completed &&
-                    row.parent_submitted &&
                     (data.selected_traits ?? selection).length > 0,
                 }
               : row,
@@ -420,11 +419,6 @@ const TeacherDashboard = () => {
                     {!row.survey_completed && (
                       <Typography variant="caption" color="text.secondary" display="block">
                         自评问卷需完整填写
-                      </Typography>
-                    )}
-                    {!row.parent_submitted && (
-                      <Typography variant="caption" color="text.secondary" display="block">
-                        家长寄语尚未提交
                       </Typography>
                     )}
                     {!row.teacher_submitted && (

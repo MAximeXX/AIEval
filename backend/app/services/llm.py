@@ -256,9 +256,9 @@ class LlmService:
             careers = ["劳动教育推广者"]
         career_text = "、".join(careers)
         message = (
-            "😊亲爱的小彩蝶：\n"
+            "😊亲爱的蝶宝：\n"
             "      在家里你能主动分担家务劳动，在学校认真完成班级劳动、校园劳动，还积极参加社会实践😲👍，培养了坚毅担责、勤劳诚实、合作智慧的美好品格🤩；"
-            f"你特别擅长{category_text}，希望你能继续发挥这一优势，未来朝着成为一名优秀的{career_text}而努力🥳！"
+            f"你特别擅长{category_text}，希望你能继续发挥这一优势，未来也许能够成为一名优秀的{career_text}哦🥳！"
         )
         return message, careers
 
@@ -281,7 +281,7 @@ class LlmService:
 
 def build_llm_payload(
     survey: SurveyResponse,
-    parent_note: ParentNote,
+    parent_note: ParentNote | None,
     teacher_review: TeacherReview,
     composite: Optional[CompositeResponse],
 ) -> Dict[str, Any]:
@@ -305,7 +305,7 @@ def build_llm_payload(
         "selected_categories": selected_categories,
         "selected_traits": selected_traits,
         "composite_scores": composite_summary,
-        "parent_note": parent_note.content,
+        "parent_note": parent_note.content if parent_note else "",
         "teacher_review_text": teacher_review.rendered_text,
         "grade_band": survey.grade_band.value if survey.grade_band else None,
     }

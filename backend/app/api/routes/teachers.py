@@ -32,11 +32,19 @@ from app.schemas.survey import (
     SurveyResponseOut,
     TeacherReviewIn,
     TeacherReviewOut,
+    LlmEvalOut,
 )
 from app.schemas.users import StudentDashboardItem
 from app.services.completion import is_student_submission_complete, touch_completion
 from app.services.realtime import manager
 from app.services.teacher_review import get_grade_traits, render_review_text
+from app.services.llm import LlmService, build_llm_payload
+from app.api.routes.students import (
+    _get_response as student_get_response,
+    _get_parent_note as student_get_parent_note,
+    _get_teacher_review as student_get_teacher_review,
+    _get_composite_response as student_get_composite_response,
+)
 
 router = APIRouter(prefix="/teacher", tags=["教师端"])
 
@@ -123,7 +131,7 @@ async def list_students(
         completion = stu.completion_status
         parent_submitted = bool(completion and completion.parent_submitted)
         teacher_submitted = bool(completion and completion.teacher_submitted)
-        info_completed = bool(survey_completed and parent_submitted and teacher_submitted)
+        info_completed = bool(survey_completed and teacher_submitted)
 
         items.append(
             StudentDashboardItem(
@@ -179,6 +187,67 @@ async def get_student_detail(
         "teacher_review": review,
         "lock": lock_status,
     }
+
+
+@router.get(
+    "/students/{student_id}/llm-eval",
+    response_model=LlmEvalOut,
+    summary="查看学生彩小蝶综合评语",
+)
+async def get_student_llm_eval(
+    student_id: UUID,
+    current_user: User = Depends(get_current_teacher),
+    db: AsyncSession = Depends(get_db),
+) -> LlmEvalOut:
+    student = await db.get(User, student_id)
+    if not student:
+        raise HTTPException(status_code=404, detail="用户不存在")
+    await _ensure_same_class(current_user, student)
+
+    survey = await student_get_response(
+        db,
+        student_id,
+        ResponderType.STUDENT,
+        with_items=True,
+    )
+    if not survey or not survey.items:
+        raise HTTPException(status_code=400, detail="请先完成问卷提交")
+
+    expected_items_stmt = await db.execute(
+        select(func.count(SurveyItem.id)).where(
+            SurveyItem.grade_band == survey.grade_band
+        )
+    )
+    expected_items = expected_items_stmt.scalar_one()
+    answered_items = len(survey.items)
+    if answered_items != expected_items:
+        raise HTTPException(status_code=400, detail="请先完成全部问卷题目")
+    if any(not item.frequency or not item.skill for item in survey.items):
+        raise HTTPException(status_code=400, detail="请先完整填写全部问卷题目")
+
+    parent_note = await student_get_parent_note(db, student_id)
+    review = await student_get_teacher_review(db, student_id)
+    if not review:
+        raise HTTPException(status_code=400, detail="请先完成教师评价")
+
+    composite = await student_get_composite_response(db, student_id)
+    if not composite or not composite.payload:
+        raise HTTPException(status_code=400, detail="请先完善综合问题信息")
+
+    payload = build_llm_payload(survey, parent_note, review, composite)
+    llm_service = LlmService()
+    llm_eval = await llm_service.generate_once(
+        db,
+        student,
+        survey,
+        parent_note,
+        review,
+        payload,
+        force_refresh=False,
+    )
+    await touch_completion(db, student_id, llm_generated=True)
+    await db.commit()
+    return LlmEvalOut(content=llm_eval.content, generated_at=llm_eval.generated_at)
 
 
 async def _fetch_survey(db: AsyncSession, student_id: UUID) -> SurveyResponseOut | None:
@@ -308,7 +377,7 @@ async def teacher_override_survey(
         .options(selectinload(SurveyResponse.items))
     )
     result = await db.execute(existing_stmt)
-    response = result.scalar_one_or_none()
+    response = result.scalars().unique().one_or_none()
     if not response:
         response = SurveyResponse(
             student_id=student_id,
@@ -321,6 +390,8 @@ async def teacher_override_survey(
     await db.execute(
         delete(SurveyResponseItem).where(SurveyResponseItem.response_id == response.id)
     )
+    # clear relationship cache to avoid lazy loads after bulk delete
+    response.items = []
 
     ids = [item.survey_item_id for item in payload.items]
     stmt_items = select(SurveyItem).where(SurveyItem.id.in_(ids))

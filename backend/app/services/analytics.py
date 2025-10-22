@@ -23,7 +23,6 @@ async def compute_progress(db: AsyncSession) -> list[dict]:
                 case(
                     (
                         CompletionStatus.student_submitted
-                        & CompletionStatus.parent_submitted
                         & CompletionStatus.teacher_submitted,
                         1,
                     ),

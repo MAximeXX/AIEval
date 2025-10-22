@@ -1,18 +1,12 @@
-import {
-  Button,
-  Card,
-  CardContent,
-  CircularProgress,
-  Stack,
-  Typography,
-} from "@mui/material";
+import { Button, Card, CardContent, CircularProgress, Stack, Typography } from "@mui/material";
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 
 import client from "../../api/client";
 import { toastError } from "../../components/toast";
 
-const AiEvaluationPage = () => {
+const TeacherAiEvaluationPage = () => {
+  const { studentId } = useParams<{ studentId: string }>();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [content, setContent] = useState<string | null>(null);
@@ -20,20 +14,25 @@ const AiEvaluationPage = () => {
 
   useEffect(() => {
     const load = async () => {
+      if (!studentId) {
+        return;
+      }
+      setLoading(true);
       try {
-        const { data } = await client.post("/students/me/llm-eval");
-        setContent(data.content);
+        const { data } = await client.get(`/teacher/students/${studentId}/llm-eval`);
+        setContent(data.content ?? "");
       } catch (error: any) {
         const message =
-          error?.response?.data?.detail ?? "暂时无法生成，请稍后再试";
+          error?.response?.data?.detail ?? "暂时无法获取综评，请稍后再试~";
         toastError(message);
         setContent(message);
       } finally {
         setLoading(false);
       }
     };
+
     load();
-  }, []);
+  }, [studentId]);
 
   useEffect(() => {
     if (content === null) {
@@ -76,20 +75,23 @@ const AiEvaluationPage = () => {
             🦋智能综评
           </Typography>
           <Typography sx={{ whiteSpace: "pre-wrap", lineHeight: 2 }}>
-            {displayText}
+            {displayText || "暂未生成评语"}
           </Typography>
         </CardContent>
       </Card>
-      <Stack direction={{ xs: "column", md: "row" }} spacing={2}>
-        <Button variant="contained" onClick={() => navigate("/student/survey")}>
-          ↩️返回问卷填写
+      <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
+        <Button
+          variant="contained"
+          onClick={() => navigate(`/teacher/students/${studentId}`)}
+        >
+          返回查看问卷
         </Button>
-        <Button variant="outlined" onClick={() => navigate("/student/review")}>
-          👩‍🏫查看老师对你的评价
+        <Button variant="outlined" onClick={() => navigate("/teacher")}>
+          返回班级列表
         </Button>
       </Stack>
     </Stack>
   );
 };
 
-export default AiEvaluationPage;
+export default TeacherAiEvaluationPage;
