@@ -96,7 +96,8 @@ const LoginPage = () => {
           borderRadius: 4,
           position: "relative",
           overflow: "visible",
-          backgroundColor: "rgba(255, 255, 255, 0.88)",
+          // 加大透明度让登录框更轻盈
+          backgroundColor: "rgba(255, 255, 255, 0.52)",
           backdropFilter: "blur(1px)",
         }}
       >
@@ -129,7 +130,16 @@ const LoginPage = () => {
                 variant="h4"
                 fontWeight={700}
                 color="primary"
-                sx={{ whiteSpace: "nowrap" }}
+                sx={{
+                  whiteSpace: "nowrap",
+                  fontSize: { xs: "1.65rem", sm: "2.0rem" },
+                  background:
+                    "linear-gradient(90deg, #ff6b6b, #ff8e53, #ffd93d, #6bcb77, #4d96ff, #845ef7, #f06292)",
+                  WebkitBackgroundClip: "text",
+                  WebkitTextFillColor: "transparent",
+                  backgroundClip: "text",
+                  textShadow: "0 2px 4px rgba(0, 0, 0, 0.12)",
+                }}
               >
                 南湖“小彩蝶”劳动益“美”行
               </Typography>
@@ -138,8 +148,23 @@ const LoginPage = () => {
                 color="primary"
                 fontWeight={500}
                 mt={1}
+                sx={{ display: "inline-flex", alignItems: "center", gap: 0.5 }}
               >
-                🦋蝶宝劳动成长评价
+                <Box component="span" sx={{ lineHeight: 1 }}>
+                  🦋
+                </Box>
+                <Box
+                  component="span"
+                  sx={{
+                    background: "linear-gradient(90deg, #34c759, #0a84ff)",
+                    WebkitBackgroundClip: "text",
+                    WebkitTextFillColor: "transparent",
+                    backgroundClip: "text",
+                    color: "transparent",
+                  }}
+                >
+                  蝶宝劳动成长评价
+                </Box>
               </Typography>
             </Box>
             <FormControl fullWidth>

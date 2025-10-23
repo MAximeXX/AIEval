@@ -437,30 +437,34 @@ const AdminDashboard = () => {
 
   return (
     <Box sx={{ backgroundColor: "#f0f9ff", minHeight: "100vh" }}>
-      <Stack
-        direction={{ xs: "column", md: "row" }}
-        spacing={2}
-        alignItems={{ xs: "flex-start", md: "center" }}
-        justifyContent="space-between"
-        sx={{ py: 3, px: 4 }}
-      >
-        <Stack direction="row" spacing={1.5} alignItems="center">
-          <Typography color="primary" sx={{ fontSize: "1.5rem" }}>
-            🦋
-          </Typography>
-          <Typography variant="h6" color="primary" fontWeight={700}>
-            全校信息汇总
-          </Typography>
-        </Stack>
-        <Button
-          startIcon={<LogoutIcon />}
-          variant="outlined"
-          onClick={handleLogout}
+      <Container maxWidth="xl" sx={{ py: 3 }}>
+        <Stack
+          direction={{ xs: "column", md: "row" }}
+          spacing={2}
+          alignItems={{ xs: "flex-start", md: "center" }}
+          justifyContent="space-between"
         >
-          退出系统
-        </Button>
-      </Stack>
-      <Container maxWidth="xl" sx={{ py: 4 }}>
+          <Stack direction="row" spacing={1.5} alignItems="center">
+            <Typography
+              color="primary"
+              sx={{ fontSize: { xs: "2.5rem", md: "3rem" }, lineHeight: 1 }}
+            >
+              🦋
+            </Typography>
+            <Typography variant="h6" color="primary" fontWeight={700}>
+              全校信息汇总
+            </Typography>
+          </Stack>
+          <Button
+            startIcon={<LogoutIcon />}
+            variant="outlined"
+            onClick={handleLogout}
+          >
+            退出系统
+          </Button>
+        </Stack>
+      </Container>
+      <Container maxWidth="xl" sx={{ pt: 0.2, pb: 4 }}>
         <Grid container spacing={3}>
           <Grid item xs={12}>
             <Paper elevation={3} sx={{ borderRadius: 3, p: 3 }}>
