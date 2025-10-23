@@ -1,6 +1,5 @@
 import { Box, Button, Container, Stack, Typography } from "@mui/material";
 import LogoutIcon from "@mui/icons-material/Logout";
-import EmojiNatureIcon from "@mui/icons-material/EmojiNature";
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 
@@ -84,7 +83,9 @@ const StudentLayout = ({ children }: Props) => {
             spacing={2}
           >
             <Stack direction="row" spacing={1} alignItems="center">
-              <EmojiNatureIcon color="primary" />
+              <Typography color="primary" sx={{ fontSize: "1.5rem" }}>
+                🦋
+              </Typography>
               <Typography variant="h6" color="primary" fontWeight={700}>
                 南湖“小彩蝶”劳动益“美”行——蝶宝劳动成长评价
               </Typography>

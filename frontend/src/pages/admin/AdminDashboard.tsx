@@ -4,15 +4,21 @@ import {
   Card,
   CardContent,
   Container,
+  Fade,
   Grid,
+  List,
+  ListItemButton,
+  ListItemText,
   Paper,
+  Popper,
   Stack,
   Typography,
 } from "@mui/material";
-import EmojiNatureIcon from "@mui/icons-material/EmojiNature";
 import LogoutIcon from "@mui/icons-material/Logout";
 import ReactECharts from "echarts-for-react";
-import { useEffect, useMemo, useState } from "react";
+import type { MouseEvent as ReactMouseEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 
 import client from "../../api/client";
 import { useAuthStore } from "../../store/auth";
@@ -39,6 +45,15 @@ type GradeBandKey = "low" | "mid" | "high";
 
 const STAGE_POSITIONS: number[] = [15, 50, 85];
 
+type TeacherStudentRow = {
+  student_id: string;
+  student_no: string | null;
+  student_name: string;
+  class_no: string | null;
+  grade: number;
+  grade_band: string;
+};
+
 const BAND_CONFIG: Record<
   GradeBandKey,
   { label: string; color: string }
@@ -51,6 +66,7 @@ const BAND_CONFIG: Record<
 const CHART_HEIGHT = 320;
 
 const AdminDashboard = () => {
+  const navigate = useNavigate();
   const clearAuth = useAuthStore((state) => state.clear);
   const [progress, setProgress] = useState<ProgressItem[]>([]);
   const [chartA, setChartA] = useState<ChartA>({});
@@ -58,6 +74,12 @@ const AdminDashboard = () => {
   const [chartC, setChartC] = useState<ChartLine>({});
   const [overallB, setOverallB] = useState<Record<string, number>>({});
   const [overallC, setOverallC] = useState<Record<string, number>>({});
+  const [studentsByClass, setStudentsByClass] = useState<
+    Record<string, TeacherStudentRow[]>
+  >({});
+  const [dropdownAnchor, setDropdownAnchor] = useState<HTMLElement | null>(null);
+  const [openClassKey, setOpenClassKey] = useState<string | null>(null);
+  const popperRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     const load = async () => {
@@ -74,6 +96,119 @@ const AdminDashboard = () => {
     };
     load();
   }, []);
+
+  useEffect(() => {
+    const loadStudents = async () => {
+      try {
+        const { data } = await client.get<TeacherStudentRow[]>(
+          "/teacher/class/students",
+        );
+        const grouped: Record<string, TeacherStudentRow[]> = {};
+        data.forEach((item) => {
+          const key = `${item.grade ?? ""}-${(item.class_no ?? "").trim()}`;
+          if (!grouped[key]) {
+            grouped[key] = [];
+          }
+          grouped[key].push(item);
+        });
+        Object.keys(grouped).forEach((key) => {
+          grouped[key].sort((a, b) => {
+            const aNo = a.student_no ?? "";
+            const bNo = b.student_no ?? "";
+            return aNo.localeCompare(bNo, "zh-CN");
+          });
+        });
+        setStudentsByClass(grouped);
+      } catch {
+        // ignore loading errors; overlay will simply show empty state
+      }
+    };
+    loadStudents();
+  }, []);
+
+  const buildClassKey = useCallback(
+    (grade: number, classNo: string | null | undefined) =>
+      `${grade ?? ""}-${(classNo ?? "").trim()}`,
+    [],
+  );
+
+  const studentsForDropdown = useMemo(() => {
+    if (!openClassKey) {
+      return [];
+    }
+    return studentsByClass[openClassKey] ?? [];
+  }, [openClassKey, studentsByClass]);
+
+  const handleCloseDropdown = useCallback(() => {
+    setOpenClassKey(null);
+    setDropdownAnchor(null);
+    sessionStorage.removeItem("adminClassDropdown");
+  }, []);
+
+  const handleClassClick = useCallback(
+    (event: ReactMouseEvent<HTMLElement>, grade: number, classNo: string) => {
+      const key = buildClassKey(grade, classNo);
+      if (openClassKey === key) {
+        handleCloseDropdown();
+        return;
+      }
+      setDropdownAnchor(event.currentTarget);
+      setOpenClassKey(key);
+      sessionStorage.setItem("adminClassDropdown", key);
+    },
+    [buildClassKey, handleCloseDropdown, openClassKey],
+  );
+
+  const handleStudentNavigate = useCallback(
+    (studentId: string) => {
+      if (openClassKey) {
+        sessionStorage.setItem("adminClassDropdown", openClassKey);
+      }
+      navigate(`/admin/students/${studentId}`);
+    },
+    [navigate, openClassKey],
+  );
+
+  useEffect(() => {
+    if (!openClassKey) {
+      return;
+    }
+    const handleClickAway = (event: MouseEvent) => {
+      const target = event.target as Node | null;
+      if (!target) {
+        return;
+      }
+      if (
+        dropdownAnchor?.contains(target) ||
+        popperRef.current?.contains(target)
+      ) {
+        return;
+      }
+      handleCloseDropdown();
+    };
+    document.addEventListener("mousedown", handleClickAway);
+    return () => document.removeEventListener("mousedown", handleClickAway);
+  }, [dropdownAnchor, handleCloseDropdown, openClassKey]);
+
+  useEffect(() => {
+    const storedKey = sessionStorage.getItem("adminClassDropdown");
+    if (!storedKey) {
+      return;
+    }
+    if (!studentsByClass[storedKey]) {
+      if (Object.keys(studentsByClass).length > 0) {
+        sessionStorage.removeItem("adminClassDropdown");
+      }
+      return;
+    }
+    const element = document.querySelector<HTMLElement>(
+      `[data-class-key="${storedKey}"]`,
+    );
+    if (element) {
+      setDropdownAnchor(element);
+      setOpenClassKey(storedKey);
+    }
+  }, [studentsByClass]);
 
   const groupedProgress = useMemo(() => {
     const map = new Map<string, ProgressItem[]>();
@@ -310,7 +445,9 @@ const AdminDashboard = () => {
         sx={{ py: 3, px: 4 }}
       >
         <Stack direction="row" spacing={1.5} alignItems="center">
-          <EmojiNatureIcon color="primary" />
+          <Typography color="primary" sx={{ fontSize: "1.5rem" }}>
+            🦋
+          </Typography>
           <Typography variant="h6" color="primary" fontWeight={700}>
             全校信息汇总
           </Typography>
@@ -372,34 +509,56 @@ const AdminDashboard = () => {
                         }
                         const classLabel =
                           classNumber === "-" ? "—" : `${classNumber}班`;
+                        const classKey = buildClassKey(
+                          item.grade,
+                          item.class_no,
+                        );
                         return (
                           <Box
-                          key={`${item.grade}-${item.class_no}`}
-                          sx={{
-                            borderRadius: 1,
-                            px: 1.5,
-                            py: 1,
-                            display: "flex",
-                            justifyContent: "space-between",
-                            alignItems: "center",
-                            backgroundColor: "rgba(14, 165, 233, 0.08)",
-                          }}
-                          >
-                          <Typography fontWeight={600}>
-                            {classLabel}
-                          </Typography>
-                          <Typography
-                            fontWeight={700}
+                            key={`${item.grade}-${item.class_no}`}
+                            data-class-key={classKey}
+                            onClick={(event) =>
+                              handleClassClick(
+                                event,
+                                item.grade,
+                                item.class_no ?? "",
+                              )
+                            }
                             sx={{
-                              color:
-                                item.total > 0 && item.completed >= item.total
-                                  ? "success.main"
-                                  : "warning.main",
+                              borderRadius: 1,
+                              px: 1.5,
+                              py: 1,
+                              display: "flex",
+                              justifyContent: "space-between",
+                              alignItems: "center",
+                              backgroundColor: "rgba(14, 165, 233, 0.08)",
+                              cursor: "pointer",
+                              transition: "background-color 0.2s",
+                              border:
+                                openClassKey === classKey
+                                  ? "1px solid rgba(14,165,233,0.4)"
+                                  : "1px solid transparent",
+                              boxShadow:
+                                openClassKey === classKey
+                                  ? "0 0 0 2px rgba(14,165,233,0.12)"
+                                  : "none",
                             }}
                           >
-                            {item.completed}/{item.total}
-                          </Typography>
-                        </Box>
+                            <Typography fontWeight={600} sx={{ textDecoration: "underline" }}>
+                              {classLabel}
+                            </Typography>
+                            <Typography
+                              fontWeight={700}
+                              sx={{
+                                color:
+                                  item.total > 0 && item.completed >= item.total
+                                    ? "success.main"
+                                    : "warning.main",
+                              }}
+                            >
+                              {item.completed}/{item.total}
+                            </Typography>
+                          </Box>
                         );
                       })}
                       {Array.from({ length: Math.max(0, maxRows - column.items.length) }).map((_, index) => (
@@ -479,6 +638,55 @@ const AdminDashboard = () => {
           </Grid>
         </Grid>
       </Container>
+      <Popper
+        open={Boolean(dropdownAnchor && openClassKey)}
+        anchorEl={dropdownAnchor}
+        placement="bottom-start"
+        transition
+        modifiers={[{ name: "offset", options: { offset: [0, 8] } }]}
+      >
+        {({ TransitionProps }) => (
+          <Fade {...TransitionProps} timeout={150}>
+            <Paper
+              ref={popperRef}
+              elevation={6}
+              sx={{
+                borderRadius: 2,
+                minWidth: 220,
+                maxHeight: 320,
+                overflowY: "auto",
+                p: 1,
+                zIndex: 1400,
+              }}
+            >
+              {studentsForDropdown.length > 0 ? (
+                <List dense>
+                  {studentsForDropdown.map((student) => {
+                    const number = (student.student_no ?? "").trim();
+                    const displayName = number
+                      ? `${number} ${student.student_name}`
+                      : student.student_name;
+                    return (
+                      <ListItemButton
+                        key={student.student_id}
+                        onClick={() => handleStudentNavigate(student.student_id)}
+                      >
+                        <ListItemText primary={displayName} />
+                      </ListItemButton>
+                    );
+                  })}
+                </List>
+              ) : (
+                <Box px={1.5} py={1}>
+                  <Typography color="text.secondary">
+                    暂未查询到学生信息
+                  </Typography>
+                </Box>
+              )}
+            </Paper>
+          </Fade>
+        )}
+      </Popper>
     </Box>
   );
 };

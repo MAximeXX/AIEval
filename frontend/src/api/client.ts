@@ -23,6 +23,9 @@ client.interceptors.response.use(
   (error) => {
     const message =
       error?.response?.data?.detail || "请求失败，请稍后再试";
+    if ((error as any)?.config?.skipErrorToast) {
+      return Promise.reject(error);
+    }
     if (error?.response?.status === 401) {
       toastError(message);
       useAuthStore.getState().clear();

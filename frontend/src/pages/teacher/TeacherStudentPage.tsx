@@ -720,6 +720,9 @@ const TeacherStudentPage = () => {
 const traitsList = config?.traits ?? [];
 
   const stages = useMemo(() => {
+    if ((detail?.student.grade ?? 0) === 1) {
+      return [];
+    }
     const question = config?.composite_questions.find(
       (item) => item.key === "q3",
     );
