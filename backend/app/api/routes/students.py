@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from typing import Any
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import delete, func, select
@@ -28,12 +29,19 @@ from app.schemas.survey import (
     LlmEvalOut,
     ParentNoteIn,
     ParentNoteOut,
+    SurveySaveQueuedIn,
     SurveyResponseIn,
     SurveyResponseOut,
 )
+from app.schemas.tasks import TaskStatusOut, TaskSubmissionOut
 from app.services.completion import is_student_submission_complete, touch_completion
 from app.services.llm import LlmService, build_llm_payload
 from app.services.realtime import manager
+from app.services.task_queue import (
+    TaskQueueStatus,
+    enqueue_student_survey_task,
+    get_task_status as get_queue_task_status,
+)
 
 router = APIRouter(prefix="/students/me", tags=["学生端"])
 
@@ -179,6 +187,28 @@ async def put_my_survey(
     return result_data
 
 
+@router.post(
+    "/survey/queued",
+    response_model=TaskSubmissionOut,
+    summary="排队保存我的问卷",
+)
+async def queue_my_survey(
+    payload: SurveySaveQueuedIn,
+    current_user: User = Depends(get_current_student),
+    db: AsyncSession = Depends(get_db),
+) -> TaskSubmissionOut:
+    await _ensure_unlocked(db, current_user)
+    task_id = await enqueue_student_survey_task(
+        current_user.id,
+        {
+            "items": [item.model_dump() for item in payload.items],
+            "composite": payload.composite.model_dump(),
+        },
+    )
+    task_uuid = UUID(task_id)
+    return TaskSubmissionOut(task_id=task_uuid, status=TaskQueueStatus.PENDING.value)
+
+
 async def _fetch_items_map(
     db: AsyncSession, items: list[Any]
 ) -> dict[int, SurveyItem]:
@@ -238,6 +268,27 @@ async def put_composite(
         submitted_at=composite.submitted_at,
         updated_at=composite.updated_at,
     )
+
+
+@router.get(
+    "/tasks/{task_id}",
+    response_model=TaskStatusOut,
+    summary="查询保存任务状态",
+)
+async def get_task_status(
+    task_id: UUID,
+    current_user: User = Depends(get_current_student),
+) -> TaskStatusOut:
+    data = await get_queue_task_status(str(task_id))
+    if not data or data.get("student_id") != str(current_user.id):
+        raise HTTPException(status_code=404, detail="任务不存在")
+    status_value = data.get("status", TaskQueueStatus.PENDING.value)
+    try:
+        normalized_status = TaskQueueStatus(status_value).value
+    except ValueError:
+        normalized_status = TaskQueueStatus.PENDING.value
+    message = data.get("message")
+    return TaskStatusOut(task_id=task_id, status=normalized_status, message=message)
 
 
 @router.get(

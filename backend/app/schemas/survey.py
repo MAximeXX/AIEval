@@ -65,6 +65,11 @@ class CompositeResponseOut(CompositeResponseIn):
     updated_at: datetime
 
 
+class SurveySaveQueuedIn(BaseModel):
+    items: list[SurveyResponseItemIn]
+    composite: CompositeResponseIn
+
+
 class ParentNoteIn(BaseModel):
     content: str = Field(max_length=300, min_length=0)
 

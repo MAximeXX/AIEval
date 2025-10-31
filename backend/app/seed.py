@@ -14,6 +14,7 @@ from app.db.session import Base, async_session_maker, engine
 from app.models.survey import SurveyItem
 from app.models.user import GradeBand, User, UserRole
 from app.services.questionnaire import load_questionnaire
+from tqdm import tqdm
 
 
 CSV_USER_PATH = Path(__file__).resolve().parents[2] / "test.csv"
@@ -171,7 +172,8 @@ async def seed_users(session: AsyncSession) -> None:
             )
         )
 
-    for payload in _load_users_from_csv():
+    user_rows = _load_users_from_csv()
+    for payload in tqdm(user_rows, desc="导入账号", unit="条"):
         session.add(User(**payload))
 
 

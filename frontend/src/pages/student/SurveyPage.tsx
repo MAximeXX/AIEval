@@ -76,6 +76,21 @@ type StudentSurveyResponse = {
   items: StudentSurveyItem[];
 };
 
+type StudentSurveyResponseWithLock = StudentSurveyResponse & {
+  is_locked?: boolean;
+};
+
+type SurveySaveTaskResponse = {
+  task_id: string;
+  status: "pending";
+};
+
+type SurveyTaskStatusResponse = {
+  task_id: string;
+  status: "pending" | "completed" | "failed";
+  message?: string | null;
+};
+
 const surveyFrequencyOptions = ["每天", "经常", "偶尔"];
 const frequencyOptions = ["每天", "经常", "偶尔", "从不"];
 const skillOptions = ["熟练", "一般", "不会"];
@@ -96,6 +111,11 @@ const compositeStageHints: Record<
   },
 };
 const ENABLE_SURVEY_AUTOFILL = import.meta.env.VITE_ENABLE_SURVEY_AUTOFILL === "true";
+
+const wait = (ms: number) =>
+  new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
 
 type SurveyContentProps = {
   config: SurveyConfig;
@@ -890,6 +910,57 @@ const SurveyPage = () => {
     return question.rows_by_grade[String(grade)] ?? [];
   }, [config, grade]);
 
+  const syncSurveyFromServer = useCallback(async () => {
+    const [{ data: surveyData }, { data: compositeData }] = await Promise.all([
+      client.get<StudentSurveyResponseWithLock>("/students/me/survey", {
+        params: { _: Date.now() },
+        skipErrorToast: true,
+      } as any),
+      client.get("/students/me/composite", { skipErrorToast: true } as any),
+    ]);
+    const locked = Boolean((surveyData as any)?.is_locked);
+    setIsLocked(locked);
+    (window as any).__studentLockStatus = locked;
+    if (surveyData?.items) {
+      const syncedAnswers: Record<number, SurveyItemAnswer> = {};
+      surveyData.items.forEach((item) => {
+        syncedAnswers[item.survey_item_id] = {
+          frequency: item.frequency ?? "",
+          skill: item.skill ?? "",
+          traits: item.traits ?? [],
+        };
+      });
+      setAnswers(syncedAnswers);
+    } else {
+      setAnswers({});
+    }
+    if (compositeData) {
+      setComposite({
+        q1: compositeData.q1 ?? { 原来: "", 现在: "" },
+        q2: compositeData.q2 ?? { 原来: "", 现在: "" },
+        q3: compositeData.q3 ?? {},
+      });
+    }
+  }, []);
+
+  const pollTaskStatus = useCallback(async (taskId: string) => {
+    const maxAttempts = 40;
+    for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+      const { data } = await client.get<SurveyTaskStatusResponse>(
+        `/students/me/tasks/${taskId}`,
+        { skipErrorToast: true } as any,
+      );
+      if (data.status === "completed") {
+        return;
+      }
+      if (data.status === "failed") {
+        throw new Error(data.message || "保存失败，请稍后再试~");
+      }
+      await wait(1500);
+    }
+    throw new Error("保存耗时较长，请稍后在页面中确认结果~");
+  }, []);
+
   const ensureSurveyComplete = useCallback(async (): Promise<boolean> => {
     if (!config) {
       toastError("问卷配置尚未加载完成，请稍后再试~");
@@ -1127,48 +1198,27 @@ const SurveyPage = () => {
           traits: value.traits,
         }));
 
-      const { data: savedSurvey } = await client.put("/students/me/survey", {
-        items: payload,
-      });
-      const { data: savedComposite } = await client.put(
-        "/students/me/composite",
-        composite,
+      const { data } = await client.post<SurveySaveTaskResponse>(
+        "/students/me/survey/queued",
+        {
+          items: payload,
+          composite,
+        },
       );
-      const locked = Boolean(savedSurvey?.is_locked);
-      setIsLocked(locked);
-      (window as any).__studentLockStatus = locked;
-
-      if (savedSurvey?.items) {
-        const syncedAnswers: Record<number, SurveyItemAnswer> = {};
-        savedSurvey.items.forEach(
-          (item: {
-            survey_item_id: number;
-            frequency: string | null;
-            skill: string | null;
-            traits: string[];
-          }) => {
-            syncedAnswers[item.survey_item_id] = {
-              frequency: item.frequency ?? "",
-              skill: item.skill ?? "",
-              traits: item.traits ?? [],
-            };
-          },
-        );
-        setAnswers(syncedAnswers);
-      }
-      if (savedComposite) {
-        setComposite({
-          q1: savedComposite.q1 ?? { 原来: "", 现在: "" },
-          q2: savedComposite.q2 ?? { 原来: "", 现在: "" },
-          q3: savedComposite.q3 ?? {},
-        });
-      }
+      await pollTaskStatus(data.task_id);
+      await syncSurveyFromServer();
       toastSuccess("问卷信息已保存");
       setDirtySurvey(false);
+    } catch (error: any) {
+      const message =
+        error?.message ??
+        error?.response?.data?.detail ??
+        "保存失败，请稍后重试~";
+      toastError(message);
     } finally {
       setSavingSurvey(false);
     }
-  }, [answers, composite, guardLocked]);
+  }, [answers, composite, guardLocked, pollTaskStatus, syncSurveyFromServer]);
 
   const saveParentNote = useCallback(async () => {
     if (guardLocked()) {
