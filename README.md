@@ -1,6 +1,15 @@
 # 小彩蝶劳动益美行评测 Web App
 
-> 全部源代码与文档均使用 UTF-8 编码；请确保编辑器与终端均以 UTF-8 读取。
+### 登陆界面
+<img width="1919" height="1005" alt="{D833D229-F52C-417A-9F70-7AA84969D4B3}" src="https://github.com/user-attachments/assets/60579002-9b98-4cef-981c-38e7a47100e3" />
+### 学生问卷界面
+<img width="1920" height="1006" alt="{027F1B4B-8B6A-486D-BE9A-A49868CEEE43}" src="https://github.com/user-attachments/assets/edae4a15-69c9-4b6e-9177-dc051bdc2024" />
+### 班级列表界面
+<img width="1891" height="989" alt="{4FBCF9E8-6AAD-4D9B-AD76-F803EE22999E}" src="https://github.com/user-attachments/assets/b01e66dc-647e-4551-a168-bf6e00ee0c4e" />
+### 智能评测界面
+<img width="1904" height="986" alt="{B5B081D4-1359-4F1E-A60F-1D7FBB78909C}" src="https://github.com/user-attachments/assets/66700e99-0b4e-4eb2-a677-81cd56e5ccee" />
+### 管理员看板界面
+![a5fb51e2d724a38b241e851dda903f1e](https://github.com/user-attachments/assets/ec8d17a2-7a9e-4af6-a174-6efb3baf16ba)
 
 ## 1. 项目概览
 
